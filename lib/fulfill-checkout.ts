@@ -75,7 +75,11 @@ export async function fulfillCheckout(
     session.amount_total == null ? "amountTotal" : null,
   ].filter((field): field is string => field != null);
 
-  if (invalidFields.length > 0) {
+  if (
+    !customerEmail ||
+    session.amount_total == null ||
+    invalidFields.length > 0
+  ) {
     console.error("Sesja Stripe nie zawiera kompletnych danych zamówienia:", {
       sessionId: session.id,
       invalidFields,
