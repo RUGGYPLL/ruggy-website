@@ -9,6 +9,9 @@ const inpostHosts = [
   "https://geowidget.inpost.pl",
   "https://sandbox-easy-geowidget-sdk.easypack24.net",
 ].join(" ");
+// The production SDK is downloaded from geowidget.inpost.pl, but it renders
+// the map in an iframe served from this separate application origin.
+const inpostFrameHosts = `${inpostHosts} https://geowidget-app.inpost.pl`;
 
 // React's dev build uses eval() for debugging features (rebuilding call stacks
 // across the server/client boundary), and Turbopack's HMR runtime needs it too.
@@ -26,7 +29,7 @@ const contentSecurityPolicy = [
   `style-src 'self' 'unsafe-inline' ${inpostHosts}`,
   `img-src 'self' data: blob: ${supabaseOrigin}`,
   `connect-src 'self' ${supabaseOrigin} https://api.stripe.com ${inpostHosts}`,
-  `frame-src 'self' ${inpostHosts}`,
+  `frame-src 'self' ${inpostFrameHosts}`,
   "font-src 'self' data:",
   "media-src 'self'",
   "worker-src 'self' blob:",
