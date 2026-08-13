@@ -40,11 +40,11 @@ Klient przegląda ofertę, wybiera rodzaj dywanu i przechodzi do konfiguratora.
 Podaje rozmiar lub wymiary, termin, sposób dostawy, dane kontaktowe, uwagi oraz
 opcjonalne zdjęcie referencyjne. Może także dodać podkład antypoślizgowy.
 
-Piwodywany i papadywany mają zdefiniowane warianty, rozmiary i ceny oraz kończą
-się płatnością online przez Stripe. Pozostałe rodzaje korzystają z własnego
-rozmiaru i orientacyjnej ceny, po czym klient wysyła zgłoszenie do indywidualnej
-wyceny prowadzonej na Instagramie. Osobna ścieżka płatności pozwala opłacić
-projekt i kwotę uzgodnione wcześniej z właścicielem.
+Każda kategoria ma w panelu administracyjnym własny sposób sprzedaży. Płatność
+online korzysta ze zdefiniowanych wariantów, rozmiarów i cen oraz prowadzi do
+Stripe. Wycena przez Instagram korzysta z własnych wymiarów i orientacyjnej
+ceny, po czym klient wysyła zgłoszenie do indywidualnej wyceny. Osobna ścieżka
+płatności pozwala opłacić projekt i kwotę uzgodnione wcześniej z właścicielem.
 
 Właściciel pracuje w panelu administracyjnym. Przegląda szczegóły i statusy
 zamówień, korzysta z widoku kalendarza, blokuje terminy oraz może wygenerować

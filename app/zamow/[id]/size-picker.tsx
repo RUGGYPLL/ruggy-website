@@ -43,6 +43,7 @@ type RugVariant = {
 type SizeData = {
   name: string;
   slug: string;
+  order_mode: string | null;
   rug_sizes: RugSize[];
   rug_variants: RugVariant[];
 };
@@ -108,6 +109,7 @@ export const SizePicker = ({
         .select(`
           name,
           slug,
+          order_mode,
           rug_sizes(id, label, price_cents, is_active, display_order),
           rug_variants(
             id,
@@ -148,7 +150,7 @@ export const SizePicker = ({
               customHeightCm: null,
             };
           });
-        } else if (usesDirectCheckout(nextSizeData.slug)) {
+        } else if (usesDirectCheckout(nextSizeData.order_mode)) {
           const availableSizes = getActiveSizes(nextSizeData.rug_sizes);
 
           setBooking((previous) => {
@@ -191,7 +193,7 @@ export const SizePicker = ({
   const activeVariants = getActiveVariants(sizeData?.rug_variants ?? []);
   const hasSubcategories = activeVariants.length > 0;
   const isCustomType = Boolean(
-    sizeData && !usesDirectCheckout(sizeData.slug) && !hasSubcategories,
+    sizeData && !usesDirectCheckout(sizeData.order_mode),
   );
   const selectedVariant = activeVariants.find(
     (variant) => variant.id === booking.rugVariantId,

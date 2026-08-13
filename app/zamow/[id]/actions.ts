@@ -159,7 +159,7 @@ export async function createCheckoutSession(input: unknown) {
 
   const { data: rugType, error: rugTypeError } = await supabase
     .from("rug_types")
-    .select("id, name, slug, rug_variants(id, name, is_active)")
+    .select("id, name, slug, order_mode, rug_variants(id, name, is_active)")
     .eq("id", Number(booking.rugTypeId))
     .single();
 
@@ -167,7 +167,7 @@ export async function createCheckoutSession(input: unknown) {
     return { success: false, message: "Nie znaleziono typu dywanu." };
   }
 
-  if (!usesDirectCheckout(rugType.slug)) {
+  if (!usesDirectCheckout(rugType.order_mode)) {
     return {
       success: false,
       message: "Ten wariant wymaga indywidualnej wyceny na Instagramie.",
@@ -384,7 +384,7 @@ export async function createContactBooking(input: unknown) {
 
   const { data: rugType, error: rugTypeError } = await supabase
     .from("rug_types")
-    .select("id, name, slug")
+    .select("id, name, order_mode, rug_variants(id, name, is_active)")
     .eq("id", Number(booking.rugTypeId))
     .single();
 
@@ -392,21 +392,44 @@ export async function createContactBooking(input: unknown) {
     return { success: false, message: "Nie znaleziono typu dywanu." };
   }
 
-  if (usesDirectCheckout(rugType.slug)) {
+  if (usesDirectCheckout(rugType.order_mode)) {
     return {
       success: false,
       message: "Ten wariant należy opłacić online po wybraniu rozmiaru.",
     };
   }
 
-  if (
-    booking.pickedSize != null ||
-    booking.rugVariantId != null ||
-    booking.customHeightCm == null
-  ) {
+  if (booking.pickedSize != null || booking.customHeightCm == null) {
     return {
       success: false,
       message: "Podaj własne wymiary dywanu.",
+    };
+  }
+
+  let rugVariant: { id: number | string; name: string } | null = null;
+
+  if (hasActiveRugVariants(rugType.rug_variants)) {
+    if (booking.rugVariantId == null) {
+      return { success: false, message: "Wybierz podrodzaj dywanu." };
+    }
+
+    rugVariant =
+      rugType.rug_variants.find(
+        (variant) =>
+          variant.is_active !== false &&
+          Number(variant.id) === booking.rugVariantId,
+      ) ?? null;
+
+    if (!rugVariant) {
+      return {
+        success: false,
+        message: "Wybrany podrodzaj nie należy do tej kategorii.",
+      };
+    }
+  } else if (booking.rugVariantId != null) {
+    return {
+      success: false,
+      message: "Ta kategoria nie ma dostępnych podrodzajów.",
     };
   }
 
@@ -425,10 +448,10 @@ export async function createContactBooking(input: unknown) {
     .from("bookings")
     .insert({
       rug_type_id: Number(rugType.id),
-      rug_variant_id: null,
+      rug_variant_id: rugVariant ? Number(rugVariant.id) : null,
       rug_size_id: null,
       rug_type_name: rugType.name,
-      rug_variant_name: null,
+      rug_variant_name: rugVariant?.name ?? null,
       rug_size_label: appendAntiSlipMatLabel(
         formatCustomRugSizeLabel(
           booking.customWidthCm,

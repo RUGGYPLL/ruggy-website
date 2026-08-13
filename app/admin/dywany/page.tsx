@@ -6,6 +6,7 @@ import {
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getAdminUser } from "@/lib/auth/server-admin";
 import { redirect } from "next/navigation";
+import { normalizeRugOrderMode } from "@/lib/rug-order-mode";
 import AdminShell from "../admin-shell";
 import RugCatalogClient, {
   type CatalogRugType,
@@ -39,6 +40,7 @@ type TypeRow = {
   lead_time_days: number | string | null;
   is_active: boolean | null;
   has_delay: boolean | null;
+  order_mode: string | null;
   display_order: number | string | null;
   rug_sizes: SizeRow[] | null;
   rug_variants: VariantRow[] | null;
@@ -82,7 +84,7 @@ export default async function AdminRugCatalogPage() {
     supabase
       .from("rug_types")
       .select(
-        "id, name, slug, description, lead_time_days, is_active, has_delay, display_order, rug_sizes(id, label, width_cm, price_cents, is_active, display_order), rug_variants(id, name, slug, description, is_active, display_order, rug_sizes(id, label, width_cm, price_cents, is_active, display_order))",
+        "id, name, slug, description, lead_time_days, is_active, has_delay, order_mode, display_order, rug_sizes(id, label, width_cm, price_cents, is_active, display_order), rug_variants(id, name, slug, description, is_active, display_order, rug_sizes(id, label, width_cm, price_cents, is_active, display_order))",
       ),
     // Which catalog rows order history points at — the UI uses this to explain
     // up front why a row can only be deactivated, instead of failing on click.
@@ -125,6 +127,7 @@ export default async function AdminRugCatalogPage() {
       description: row.description,
       leadTimeDays: row.lead_time_days == null ? null : Number(row.lead_time_days),
       isActive: row.is_active !== false,
+      orderMode: normalizeRugOrderMode(row.order_mode),
       hasDelay: row.has_delay === true,
       displayOrder: Number(row.display_order ?? 0),
       photos: mapRugPhotos(photosByTypeId.get(Number(row.id))),

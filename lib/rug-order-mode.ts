@@ -1,16 +1,16 @@
 export const PIWODYWANY_SLUG = "piwodywany";
 export const PAPADYWANY_SLUG = "papadywany";
 
-export const DIRECT_CHECKOUT_RUG_SLUGS = [
-  PIWODYWANY_SLUG,
-  PAPADYWANY_SLUG,
-] as const;
+export const RUG_ORDER_MODES = ["quote", "checkout"] as const;
+export type RugOrderMode = (typeof RUG_ORDER_MODES)[number];
 
-export function usesDirectCheckout(slug: string | null | undefined) {
-  return DIRECT_CHECKOUT_RUG_SLUGS.some(
-    (directCheckoutSlug) => directCheckoutSlug === slug,
-  );
-}
+export const normalizeRugOrderMode = (
+  value: string | null | undefined,
+): RugOrderMode => (value === "checkout" ? "checkout" : "quote");
+
+export const usesDirectCheckout = (
+  mode: string | null | undefined,
+) => normalizeRugOrderMode(mode) === "checkout";
 
 export function hasActiveRugVariants(
   variants:

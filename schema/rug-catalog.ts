@@ -1,4 +1,5 @@
 import * as z from "zod";
+import { RUG_ORDER_MODES } from "@/lib/rug-order-mode";
 
 // Shared by the admin catalog UI and the server actions behind it, so a field
 // the form accepts is exactly the field the action writes to Supabase.
@@ -39,6 +40,7 @@ export const rugTypeSchema = z.object({
     .min(0, "Kolejność nie może być ujemna")
     .max(9999, "Kolejność to maksimum 9999"),
   isActive: z.boolean(),
+  orderMode: z.enum(RUG_ORDER_MODES),
   // Flips the "opóźnienie" overlay on the category in the shop.
   hasDelay: z.boolean(),
 });

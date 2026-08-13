@@ -2,7 +2,10 @@
 
 import { getCategory } from "@/lib/gallery";
 import { RUG_LEAD_TIME_LABEL } from "@/lib/rug-lead-time";
-import { usesDirectCheckout } from "@/lib/rug-order-mode";
+import {
+  usesDirectCheckout,
+  type RugOrderMode,
+} from "@/lib/rug-order-mode";
 import { MAX_RUG_PHOTO_SIZE, type RugPhoto } from "@/lib/rug-photos";
 import {
   collectCatalogFieldErrors,
@@ -16,9 +19,11 @@ import {
 } from "@/schema/rug-catalog";
 import {
   Boxes,
+  AtSign,
   Check,
   ChevronDown,
   CircleDollarSign,
+  CreditCard,
   ImagePlus,
   Info,
   Layers,
@@ -86,6 +91,7 @@ export type CatalogRugType = {
   description: string | null;
   leadTimeDays: number | null;
   isActive: boolean;
+  orderMode: RugOrderMode;
   hasDelay: boolean;
   displayOrder: number;
   photos: RugPhoto[];
@@ -136,9 +142,13 @@ const toInteger = (value: string) => {
 // tables below use it so the owner never edits a table nobody will ever see.
 type SizeSource = "variants" | "type" | "custom";
 
-const getSizeSource = (slug: string, variantCount: number): SizeSource => {
+const getSizeSource = (
+  orderMode: RugOrderMode,
+  variantCount: number,
+): SizeSource => {
+  if (!usesDirectCheckout(orderMode)) return "custom";
   if (variantCount > 0) return "variants";
-  return usesDirectCheckout(slug) ? "type" : "custom";
+  return "type";
 };
 
 const activePrices = (sizes: CatalogSize[]) =>
@@ -552,7 +562,7 @@ function TypeCard({
   const [newVariantPhotos, setNewVariantPhotos] = useState<PendingPhoto[]>([]);
   const [newVariantCoverId, setNewVariantCoverId] = useState<string | null>(null);
   const pendingVariantPhotosRef = useRef<PendingPhoto[]>([]);
-  const sizeSource = getSizeSource(type.slug, type.variants.length);
+  const sizeSource = getSizeSource(type.orderMode, type.variants.length);
   const allSizes = [...type.sizes, ...type.variants.flatMap((v) => v.sizes)];
   const gallery = getCategory(type.slug);
 
@@ -680,8 +690,8 @@ function TypeCard({
               <Badge tone={type.isActive ? "green" : "muted"}>
                 {type.isActive ? "Widoczna" : "Ukryta"}
               </Badge>
-              <Badge tone={usesDirectCheckout(type.slug) ? "blue" : "yellow"}>
-                {usesDirectCheckout(type.slug)
+              <Badge tone={usesDirectCheckout(type.orderMode) ? "blue" : "yellow"}>
+                {usesDirectCheckout(type.orderMode)
                   ? "Płatność online"
                   : "Wycena na Instagramie"}
               </Badge>
@@ -753,9 +763,11 @@ function TypeCard({
                   Podrodzaje
                 </h3>
                 <p className="mt-1 text-xs text-[var(--ruggy-muted)]">
-                  {sizeSource === "variants"
-                    ? "Klient wybiera podrodzaj na osobnym ekranie, a potem jego rozmiar."
-                    : "Ta kategoria nie rozgałęzia się na podrodzaje w zamówieniu — dodane tutaj nie pojawią się u klienta."}
+                  {type.variants.length
+                    ? usesDirectCheckout(type.orderMode)
+                      ? "Klient wybiera podrodzaj na osobnym ekranie, a potem jego rozmiar."
+                      : "Klient wybiera podrodzaj na osobnym ekranie, a potem podaje własne wymiary do wyceny."
+                    : "Dodaj podrodzaj, jeśli klient ma najpierw wybrać konkretny wzór lub wariant."}
                 </p>
               </div>
 
@@ -999,6 +1011,7 @@ function TypeForm({
     leadTimeDays: String(initial?.leadTimeDays ?? 7),
     displayOrder: String(defaultDisplayOrder),
     isActive: initial?.isActive ?? true,
+    orderMode: initial?.orderMode ?? "quote",
     hasDelay: initial?.hasDelay ?? false,
   };
   const [draft, setDraft, isDirty] = useServerDraft(serverDraft);
@@ -1013,6 +1026,7 @@ function TypeForm({
       leadTimeDays: toInteger(draft.leadTimeDays),
       displayOrder: toInteger(draft.displayOrder),
       isActive: draft.isActive,
+      orderMode: draft.orderMode,
       hasDelay: draft.hasDelay,
     };
     const parsed = rugTypeSchema.safeParse(values);
@@ -1094,8 +1108,8 @@ function TypeForm({
           {isSlugUnlocked && initial ? (
             <p className="mt-1.5 flex items-start gap-1.5 text-[11px] font-bold leading-4 text-[var(--ruggy-error)]">
               <TriangleAlert size={12} className="mt-0.5 shrink-0" aria-hidden="true" />
-              Slug steruje kodem: decyduje o trybie płatności, galerii realizacji
-              i ścieżce zdjęć w /public. Zmień go tylko razem z kodem.
+              Slug steruje galerią realizacji i ścieżką zdjęć w /public. Zmień
+              go tylko razem z odpowiadającymi mu plikami.
             </p>
           ) : null}
         </div>
@@ -1110,6 +1124,37 @@ function TypeForm({
           setDraft((current) => ({ ...current, description: value }))
         }
       />
+
+      <fieldset>
+        <legend className="text-xs font-black uppercase tracking-[0.08em] text-[var(--ruggy-muted)]">
+          Sposób sprzedaży
+        </legend>
+        <div className="mt-2 grid gap-3 sm:grid-cols-2">
+          <OrderModeOption
+            mode="quote"
+            selected={draft.orderMode === "quote"}
+            disabled={pending}
+            icon={AtSign}
+            title="Wycena przez Instagram"
+            description="Klient podaje własne wymiary. Zgłoszenie zapisuje się bez płatności."
+            onSelect={() =>
+              setDraft((current) => ({ ...current, orderMode: "quote" }))
+            }
+          />
+          <OrderModeOption
+            mode="checkout"
+            selected={draft.orderMode === "checkout"}
+            disabled={pending}
+            icon={CreditCard}
+            title="Płatność od razu na stronie"
+            description="Klient wybiera zapisany rozmiar i przechodzi do płatności online."
+            onSelect={() =>
+              setDraft((current) => ({ ...current, orderMode: "checkout" }))
+            }
+          />
+        </div>
+        <InlineError message={errors.orderMode} />
+      </fieldset>
 
       <div className="grid gap-4 sm:grid-cols-3">
         <TextField
@@ -1171,6 +1216,53 @@ function TypeForm({
         deleteLabel="Usuń kategorię"
       />
     </form>
+  );
+}
+
+function OrderModeOption({
+  mode,
+  selected,
+  disabled,
+  icon: Icon,
+  title,
+  description,
+  onSelect,
+}: {
+  mode: RugOrderMode;
+  selected: boolean;
+  disabled: boolean;
+  icon: LucideIcon;
+  title: string;
+  description: string;
+  onSelect: () => void;
+}) {
+  return (
+    <label
+      className={`flex min-h-24 cursor-pointer items-start gap-3 rounded-2xl border-2 p-4 transition-colors has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-[var(--ruggy-blue)] ${
+        selected
+          ? "border-[var(--ruggy-ink)] bg-[var(--ruggy-blue-soft)]"
+          : "border-[var(--ruggy-border)] bg-[var(--ruggy-canvas)] hover:border-[var(--ruggy-border-strong)]"
+      } ${disabled ? "cursor-not-allowed opacity-60" : ""}`}
+    >
+      <input
+        type="radio"
+        name="rug-order-mode"
+        value={mode}
+        checked={selected}
+        disabled={disabled}
+        onChange={onSelect}
+        className="mt-1 size-4 shrink-0 accent-[var(--ruggy-blue)]"
+      />
+      <span className="min-w-0">
+        <span className="flex items-center gap-2 text-sm font-black text-[var(--ruggy-ink)]">
+          <Icon size={16} aria-hidden="true" />
+          {title}
+        </span>
+        <span className="mt-1 block text-xs leading-5 text-[var(--ruggy-body)]">
+          {description}
+        </span>
+      </span>
+    </label>
   );
 }
 

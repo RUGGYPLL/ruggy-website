@@ -49,7 +49,7 @@ export default async function ZamowPage() {
     supabase
       .from("rug_types")
       .select(
-        "id, name, slug, description, has_delay, rug_sizes(price_cents, is_active), rug_variants(is_active, rug_sizes(price_cents, is_active))",
+        "id, name, slug, description, has_delay, order_mode, rug_sizes(price_cents, is_active), rug_variants(is_active, rug_sizes(price_cents, is_active))",
       )
       .eq("is_active", true),
     // Deliberately a separate query, not an embed: if the photos migration has
@@ -107,7 +107,7 @@ export default async function ZamowPage() {
         ) : rugTypes?.length ? (
           <ul className="mt-12 grid gap-7 sm:grid-cols-2 lg:grid-cols-3">
             {rugTypes.map((rug) => {
-              const isCheckout = usesDirectCheckout(rug.slug);
+              const isCheckout = usesDirectCheckout(rug.order_mode);
               const hasSubcategories = hasActiveRugVariants(rug.rug_variants);
               const { cover } = resolveCategoryPhotos({
                 slug: rug.slug,

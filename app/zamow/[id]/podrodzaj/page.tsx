@@ -1,5 +1,8 @@
 import { createPublicClient } from "@/lib/supabase/public";
-import { PAPADYWANY_SLUG } from "@/lib/rug-order-mode";
+import {
+  normalizeRugOrderMode,
+  PAPADYWANY_SLUG,
+} from "@/lib/rug-order-mode";
 import {
   mapRugPhotos,
   resolveCategoryPhotos,
@@ -31,6 +34,7 @@ type RugTypeRow = {
   name: string;
   slug: string;
   has_delay: boolean | null;
+  order_mode: string | null;
   rug_variants: VariantRow[];
 };
 
@@ -53,7 +57,7 @@ export default async function PodrodzajPage({
     supabase
       .from("rug_types")
       .select(
-        "id, name, slug, has_delay, rug_variants(id, name, slug, is_active, display_order, rug_sizes(price_cents, is_active))",
+        "id, name, slug, has_delay, order_mode, rug_variants(id, name, slug, is_active, display_order, rug_sizes(price_cents, is_active))",
       )
       .eq("id", id)
       .single(),
@@ -152,6 +156,7 @@ export default async function PodrodzajPage({
                   id={variant.id}
                   name={variant.name}
                   sizes={variant.rug_sizes}
+                  mode={normalizeRugOrderMode(rugType.order_mode)}
                   cover={
                     resolveVariantPhotos({
                       variantName: variant.name,

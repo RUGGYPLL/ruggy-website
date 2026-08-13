@@ -3,6 +3,7 @@ import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import { formatPriceCents } from "@/lib/custom-rug-price";
 import type { GalleryPhoto } from "@/lib/gallery";
+import type { RugOrderMode } from "@/lib/rug-order-mode";
 
 type VariantSize = { price_cents: number | string; is_active: boolean | null };
 
@@ -11,6 +12,7 @@ interface SubcategoryCardProps {
   id: number;
   name: string;
   sizes: VariantSize[];
+  mode: RugOrderMode;
   cover?: GalleryPhoto;
 }
 
@@ -31,9 +33,11 @@ export const SubcategoryCard = ({
   id,
   name,
   sizes,
+  mode,
   cover,
 }: SubcategoryCardProps) => {
-  const price = fromPriceCents(sizes);
+  const isCheckout = mode === "checkout";
+  const price = isCheckout ? fromPriceCents(sizes) : null;
 
   return (
     <Link
@@ -65,10 +69,14 @@ export const SubcategoryCard = ({
         <div className="mt-5 flex items-center justify-between gap-4 border-t-2 border-[var(--ruggy-border)] pt-4">
           <span className="min-w-0">
             <span className="block text-[0.7rem] font-black uppercase tracking-[0.12em] text-[var(--ruggy-muted)]">
-              Cena
+              {isCheckout ? "Cena" : "Sposób zamówienia"}
             </span>
             <span className="block text-lg font-black text-[var(--ruggy-blue)]">
-              {price != null ? `od ${formatPriceCents(price)}` : "Wycena"}
+              {isCheckout
+                ? price != null
+                  ? `od ${formatPriceCents(price)}`
+                  : "Brak ceny"
+                : "Wycena na Instagramie"}
             </span>
           </span>
           <span className="inline-flex shrink-0 items-center gap-1 text-sm font-black text-[var(--ruggy-ink)] transition-transform group-hover:translate-x-1">

@@ -91,6 +91,7 @@ type RugTypeSummary = {
   slug: string;
   description: string | null;
   has_delay: boolean | null;
+  order_mode: string | null;
   rug_variants: Array<{ id: number | string; is_active: boolean | null }>;
 };
 
@@ -212,7 +213,7 @@ export default function ProductPage({
         supabase
           .from("rug_types")
           .select(
-            "name, slug, description, has_delay, rug_variants(id, is_active)",
+            "name, slug, description, has_delay, order_mode, rug_variants(id, is_active)",
           )
           .eq("id", id)
           .single(),
@@ -271,7 +272,9 @@ export default function ProductPage({
 
   const isPapadywany = rugType?.slug === PAPADYWANY_SLUG;
   const hasSubcategories = hasActiveRugVariants(rugType?.rug_variants);
-  const isDirectCheckout = rugType ? usesDirectCheckout(rugType.slug) : true;
+  const isDirectCheckout = rugType
+    ? usesDirectCheckout(rugType.order_mode)
+    : true;
   const hasDelay = rugType?.has_delay === true;
 
   // Any category with active subcategories picks one on the dedicated page

@@ -119,6 +119,7 @@ export async function createRugType(
       lead_time_days: values.leadTimeDays,
       display_order: values.displayOrder,
       is_active: values.isActive,
+      order_mode: values.orderMode,
       has_delay: values.hasDelay,
     })
     .select("id")
@@ -172,6 +173,7 @@ export async function updateRugType(
       lead_time_days: values.leadTimeDays,
       display_order: values.displayOrder,
       is_active: values.isActive,
+      order_mode: values.orderMode,
       has_delay: values.hasDelay,
     })
     .eq("id", id);
