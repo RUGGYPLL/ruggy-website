@@ -80,6 +80,7 @@ export default function AdminShell({
                 <Link
                   key={item.key}
                   href={item.href}
+                  prefetch={true}
                   aria-current={isActive ? "page" : undefined}
                   className={
                     isActive
@@ -158,6 +159,7 @@ export default function AdminShell({
                   <Link
                     key={item.key}
                     href={item.href}
+                    prefetch={true}
                     aria-current={isActive ? "page" : undefined}
                     className={
                       isActive
