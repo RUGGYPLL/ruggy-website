@@ -59,6 +59,7 @@ export default async function AdminDashboardPage({
     { data: bookingRows, error: bookingsError },
     { data: blockedRows, error: blockedError },
     { data: aiPreviewFiles, error: aiPreviewsError },
+    { data: settingsRow, error: settingsError },
   ] = await Promise.all([
     supabase
       .from("bookings")
@@ -70,6 +71,11 @@ export default async function AdminDashboardPage({
     supabase.storage
       .from(REFERENCE_IMAGES_BUCKET)
       .list(AI_RUG_PREVIEWS_FOLDER, { limit: 1000 }),
+    supabase
+      .from("site_settings")
+      .select("maintenance_mode")
+      .eq("id", "global")
+      .maybeSingle(),
   ]);
 
   const aiPreviewFileNames = new Set(
@@ -153,7 +159,7 @@ export default async function AdminDashboardPage({
       title="Panel administracyjny"
       subtitle="Zarządzanie studiem"
     >
-      {bookingsError || blockedError || aiPreviewsError ? (
+      {bookingsError || blockedError || aiPreviewsError || settingsError ? (
         <div className="mb-5 rounded-2xl border-2 border-[var(--ruggy-coral)]/40 bg-[#fff0eb] px-4 py-3 text-sm font-semibold text-[var(--ruggy-error)]">
           Nie udało się pobrać wszystkich danych panelu. Sprawdź połączenie z
           Supabase.
@@ -165,6 +171,7 @@ export default async function AdminDashboardPage({
         initialBlockedDates={blockedDates}
         initialSelectedBookingId={initialSelectedBookingId}
         todayDateKey={getPolandDateKey()}
+        initialMaintenanceMode={settingsRow?.maintenance_mode === true}
       />
     </AdminShell>
   );

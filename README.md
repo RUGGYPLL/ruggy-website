@@ -23,6 +23,12 @@ Migracja `20260802_security_hardening.sql` włącza RLS dla danych prywatnych
 i ustawia bucket `booking-reference-images` jako prywatny. Wszystkie te
 migracje muszą być zastosowane przed wdrożeniem aplikacji.
 
+Migracja `20260819_add_maintenance_mode.sql` dodaje przełącznik przerwy
+technicznej. Po jej zastosowaniu administrator może włączyć lub wyłączyć
+widoczność strony publicznej z poziomu `/admin/dashboard`. Podczas przerwy
+strony publiczne pokazują `/przerwa-techniczna`, a panel administratora i
+webhook Stripe nadal działają.
+
 ## Zdjęcia kategorii
 
 Okładkę i przykładowe realizacje wgrywasz w `/admin/dywany` — przy tworzeniu

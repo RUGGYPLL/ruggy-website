@@ -94,6 +94,40 @@ export async function toggleBlockedDate(date: string, shouldBlock: boolean) {
   return { success: true };
 }
 
+export async function toggleMaintenanceMode(shouldEnable: boolean) {
+  if (typeof shouldEnable !== "boolean") {
+    return { success: false, message: "Nieprawidłowy stan trybu przerwy." };
+  }
+
+  const supabase = await getAdminClient();
+
+  if (!supabase) {
+    return { success: false, message: "Sesja administratora wygasła." };
+  }
+
+  const { error } = await supabase
+    .from("site_settings")
+    .upsert(
+      {
+        id: "global",
+        maintenance_mode: shouldEnable,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: "id" },
+    );
+
+  if (error) {
+    console.error("Nie udało się zmienić trybu przerwy technicznej:", error);
+    return {
+      success: false,
+      message: "Nie udało się zmienić trybu przerwy technicznej.",
+    };
+  }
+
+  revalidatePath("/admin/dashboard");
+  return { success: true };
+}
+
 export async function generateAiRugPreview(bookingId: number) {
   if (!Number.isInteger(bookingId) || bookingId <= 0) {
     return { success: false, message: "Nieprawidłowy numer zamówienia." };

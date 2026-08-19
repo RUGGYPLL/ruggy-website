@@ -20,10 +20,12 @@ import {
   MapPin,
   Package,
   Phone,
+  Power,
   Search,
   Truck,
   UserRound,
   WandSparkles,
+  Wrench,
   X,
   type LucideIcon,
 } from "lucide-react";
@@ -40,6 +42,7 @@ import "react-day-picker/dist/style.css";
 import {
   generateAiRugPreview,
   toggleBlockedDate,
+  toggleMaintenanceMode,
   updateBookingStatus,
 } from "./actions";
 
@@ -171,16 +174,21 @@ export default function AdminDashboardClient({
   initialBlockedDates,
   initialSelectedBookingId,
   todayDateKey,
+  initialMaintenanceMode,
 }: {
   initialBookings: AdminBooking[];
   initialBlockedDates: string[];
   initialSelectedBookingId: number | null;
   todayDateKey: string;
+  initialMaintenanceMode: boolean;
 }) {
   const [bookings, setBookings] = useState(initialBookings);
   const [blockedDates, setBlockedDates] = useState(initialBlockedDates);
   const [selectedBookingId, setSelectedBookingId] = useState<number | null>(
     initialSelectedBookingId,
+  );
+  const [maintenanceMode, setMaintenanceMode] = useState(
+    initialMaintenanceMode,
   );
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
@@ -415,6 +423,27 @@ export default function AdminDashboardClient({
     });
   };
 
+  const handleToggleMaintenanceMode = () => {
+    const nextValue = !maintenanceMode;
+    setActionMessage(undefined);
+
+    startTransition(async () => {
+      const result = await toggleMaintenanceMode(nextValue);
+
+      if (!result.success) {
+        setActionMessage(result.message);
+        return;
+      }
+
+      setMaintenanceMode(nextValue);
+      setActionMessage(
+        nextValue
+          ? "Przerwa techniczna została włączona."
+          : "Strona publiczna została ponownie włączona.",
+      );
+    });
+  };
+
   const clearCalendarHoverTimeout = () => {
     if (calendarHoverTimeout.current) {
       clearTimeout(calendarHoverTimeout.current);
@@ -534,6 +563,49 @@ export default function AdminDashboardClient({
               icon={CircleDollarSign}
               tone="yellow"
             />
+          </div>
+        </section>
+
+        <section className="overflow-hidden rounded-[2rem] border-2 border-[var(--ruggy-ink)] bg-[var(--ruggy-ink)] text-white shadow-[5px_5px_0_var(--ruggy-yellow)]">
+          <div className="flex flex-col gap-5 px-5 py-5 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+            <div className="flex items-start gap-4">
+              <span className="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-[var(--ruggy-yellow)] text-[var(--ruggy-ink)]">
+                <Wrench size={20} aria-hidden="true" />
+              </span>
+              <div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <h2 className="text-lg font-black">Widoczność strony</h2>
+                  <span
+                    className={`rounded-full px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.08em] ${
+                      maintenanceMode
+                        ? "bg-[var(--ruggy-yellow)] text-[var(--ruggy-ink)]"
+                        : "bg-[var(--ruggy-success)] text-white"
+                    }`}
+                  >
+                    {maintenanceMode ? "Przerwa aktywna" : "Strona aktywna"}
+                  </span>
+                </div>
+                <p className="mt-1 max-w-2xl text-sm leading-6 text-white/70">
+                  {maintenanceMode
+                    ? "Odwiedzający widzą stronę przerwy technicznej. Panel administratora nadal działa."
+                    : "Włącz przerwę, gdy chcesz spokojnie podłączyć domenę lub wykonać prace na stronie."}
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              aria-pressed={maintenanceMode}
+              disabled={isPending}
+              onClick={handleToggleMaintenanceMode}
+              className={`inline-flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-full px-5 text-sm font-black transition-transform hover:-translate-y-0.5 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[var(--ruggy-yellow)] disabled:cursor-wait disabled:opacity-60 ${
+                maintenanceMode
+                  ? "bg-white text-[var(--ruggy-ink)]"
+                  : "bg-[var(--ruggy-yellow)] text-[var(--ruggy-ink)]"
+              }`}
+            >
+              <Power size={16} aria-hidden="true" />
+              {maintenanceMode ? "Włącz stronę" : "Włącz przerwę"}
+            </button>
           </div>
         </section>
 

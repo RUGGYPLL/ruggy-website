@@ -1,5 +1,9 @@
 import { createServerClient } from "@supabase/ssr";
 import { isAdminUser } from "@/lib/auth/admin";
+import {
+  MAINTENANCE_PATH,
+  shouldBypassMaintenance,
+} from "@/lib/site-maintenance";
 import { NextResponse, type NextRequest } from "next/server";
 
 const getSafeAdminPath = (value: string | null) =>
@@ -7,6 +11,10 @@ const getSafeAdminPath = (value: string | null) =>
 
 export async function proxy(request: NextRequest) {
   let response = NextResponse.next({ request });
+  const pathname = request.nextUrl.pathname;
+  const isAdminRoute = pathname.startsWith("/admin");
+  const isLoginPage = pathname === "/admin/login";
+  const isSetPasswordPage = pathname === "/admin/set-password";
 
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -31,13 +39,24 @@ export async function proxy(request: NextRequest) {
     },
   );
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  const pathname = request.nextUrl.pathname;
-  const isAdminRoute = pathname.startsWith("/admin");
-  const isLoginPage = pathname === "/admin/login";
-  const isSetPasswordPage = pathname === "/admin/set-password";
+  const user = isAdminRoute
+    ? (await supabase.auth.getUser()).data.user
+    : null;
+
+  if (!shouldBypassMaintenance(pathname)) {
+    const { data: settings, error: settingsError } = await supabase
+      .from("site_settings")
+      .select("maintenance_mode")
+      .eq("id", "global")
+      .maybeSingle();
+
+    if (!settingsError && settings?.maintenance_mode === true) {
+      const maintenanceUrl = new URL(MAINTENANCE_PATH, request.url);
+      const redirectResponse = NextResponse.redirect(maintenanceUrl);
+      redirectResponse.headers.set("Cache-Control", "no-store, max-age=0");
+      return redirectResponse;
+    }
+  }
 
   if (isAdminRoute && !isLoginPage && !isSetPasswordPage && !user) {
     const loginUrl = new URL("/admin/login", request.url);
@@ -71,5 +90,5 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/admin/:path*"],
+  matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"],
 };
