@@ -3,6 +3,7 @@ import { isAdminUser } from "@/lib/auth/admin";
 import {
   MAINTENANCE_PATH,
   shouldBypassMaintenance,
+  shouldRedirectToMaintenance,
 } from "@/lib/site-maintenance";
 import { NextResponse, type NextRequest } from "next/server";
 
@@ -39,9 +40,7 @@ export async function proxy(request: NextRequest) {
     },
   );
 
-  const user = isAdminRoute
-    ? (await supabase.auth.getUser()).data.user
-    : null;
+  let maintenanceEnabled = false;
 
   if (!shouldBypassMaintenance(pathname)) {
     const { data: settings, error: settingsError } = await supabase
@@ -50,12 +49,20 @@ export async function proxy(request: NextRequest) {
       .eq("id", "global")
       .maybeSingle();
 
-    if (!settingsError && settings?.maintenance_mode === true) {
-      const maintenanceUrl = new URL(MAINTENANCE_PATH, request.url);
-      const redirectResponse = NextResponse.redirect(maintenanceUrl);
-      redirectResponse.headers.set("Cache-Control", "no-store, max-age=0");
-      return redirectResponse;
-    }
+    maintenanceEnabled = !settingsError && settings?.maintenance_mode === true;
+  }
+
+  const user =
+    isAdminRoute || maintenanceEnabled
+      ? (await supabase.auth.getUser()).data.user
+      : null;
+  const isAdmin = Boolean(user && isAdminUser(user));
+
+  if (shouldRedirectToMaintenance(pathname, maintenanceEnabled, isAdmin)) {
+    const maintenanceUrl = new URL(MAINTENANCE_PATH, request.url);
+    const redirectResponse = NextResponse.redirect(maintenanceUrl);
+    redirectResponse.headers.set("Cache-Control", "no-store, max-age=0");
+    return redirectResponse;
   }
 
   if (isAdminRoute && !isLoginPage && !isSetPasswordPage && !user) {
@@ -72,14 +79,14 @@ export async function proxy(request: NextRequest) {
     !isLoginPage &&
     !isSetPasswordPage &&
     user &&
-    !isAdminUser(user)
+    !isAdmin
   ) {
     const forbiddenUrl = new URL("/admin/login", request.url);
     forbiddenUrl.searchParams.set("error", "forbidden");
     return NextResponse.redirect(forbiddenUrl);
   }
 
-  if (isLoginPage && user && isAdminUser(user)) {
+  if (isLoginPage && user && isAdmin) {
     const destination =
       getSafeAdminPath(request.nextUrl.searchParams.get("next")) ??
       "/admin/dashboard";

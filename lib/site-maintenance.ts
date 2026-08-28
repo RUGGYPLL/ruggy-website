@@ -5,3 +5,9 @@ export const shouldBypassMaintenance = (pathname: string) =>
   pathname === "/admin" ||
   pathname.startsWith("/admin/") ||
   pathname.startsWith("/api/");
+
+export const shouldRedirectToMaintenance = (
+  pathname: string,
+  maintenanceEnabled: boolean,
+  isAdmin: boolean,
+) => maintenanceEnabled && !isAdmin && !shouldBypassMaintenance(pathname);

@@ -587,7 +587,7 @@ export default function AdminDashboardClient({
                 </div>
                 <p className="mt-1 max-w-2xl text-sm leading-6 text-white/70">
                   {maintenanceMode
-                    ? "Odwiedzający widzą stronę przerwy technicznej. Panel administratora nadal działa."
+                    ? "Odwiedzający widzą stronę przerwy technicznej. Zalogowany administrator może nadal oglądać stronę publiczną."
                     : "Włącz przerwę, gdy chcesz spokojnie podłączyć domenę lub wykonać prace na stronie."}
                 </p>
               </div>
