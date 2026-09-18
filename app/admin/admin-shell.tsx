@@ -42,6 +42,8 @@ const navItems: Array<{
   { key: "catalog", label: "Dywany", href: "/admin/dywany", icon: Shapes },
 ];
 
+const DEPLOY_MARKER = "qmail-wa-260918";
+
 export default function AdminShell({
   userEmail,
   activeNav,
@@ -138,6 +140,12 @@ export default function AdminShell({
               </div>
 
               <div className="flex items-center gap-3">
+                <span
+                  className="max-w-[150px] truncate rounded-full border border-[var(--ruggy-border)] bg-[var(--ruggy-surface)] px-2.5 py-1 text-[10px] font-black tracking-[0.04em] text-[var(--ruggy-muted)] sm:max-w-none sm:text-xs"
+                  title={`Wersja wdrożenia: ${DEPLOY_MARKER}`}
+                >
+                  deploy {DEPLOY_MARKER}
+                </span>
                 <span className="hidden items-center gap-2 text-xs font-semibold text-[var(--ruggy-body)] sm:flex">
                   <span className="size-2 rounded-full bg-[var(--ruggy-success)]" />
                   System aktywny
