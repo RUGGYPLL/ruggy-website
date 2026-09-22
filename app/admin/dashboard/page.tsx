@@ -20,6 +20,11 @@ type BookingRow = {
   rug_type_name: string | null;
   rug_variant_name: string | null;
   rug_size_label: string | null;
+  payment_kind: string | null;
+  project_reference: string | null;
+  whatsapp_notification_status: string | null;
+  whatsapp_notification_error: string | null;
+  whatsapp_notification_sent_at: string | null;
   price_cents: number | string | null;
   customer_name: string | null;
   customer_email: string | null;
@@ -64,7 +69,7 @@ export default async function AdminDashboardPage({
     supabase
       .from("bookings")
       .select(
-        "id, rug_type_id, rug_variant_id, rug_size_id, rug_type_name, rug_variant_name, rug_size_label, price_cents, customer_name, customer_email, customer_phone, notes, booking_date, status, stripe_session_id, stripe_payment_intent_id, expires_at, created_at, updated_at, delivery_method, parcel_locker_code, delivery_address, reference_image_path",
+        "id, rug_type_id, rug_variant_id, rug_size_id, rug_type_name, rug_variant_name, rug_size_label, payment_kind, project_reference, whatsapp_notification_status, whatsapp_notification_error, whatsapp_notification_sent_at, price_cents, customer_name, customer_email, customer_phone, notes, booking_date, status, stripe_session_id, stripe_payment_intent_id, expires_at, created_at, updated_at, delivery_method, parcel_locker_code, delivery_address, reference_image_path",
       )
       .order("created_at", { ascending: false }),
     supabase.from("blocked_dates").select("date").order("date"),
@@ -94,6 +99,12 @@ export default async function AdminDashboardPage({
       rugTypeName: booking.rug_type_name,
       rugVariantName: booking.rug_variant_name,
       rugSizeLabel: booking.rug_size_label,
+      paymentKind: booking.payment_kind ?? "catalog_order",
+      projectReference: booking.project_reference,
+      whatsappNotificationStatus:
+        booking.whatsapp_notification_status ?? "not_sent",
+      whatsappNotificationError: booking.whatsapp_notification_error,
+      whatsappNotificationSentAt: booking.whatsapp_notification_sent_at,
       priceCents:
         booking.price_cents == null ? null : Number(booking.price_cents),
       customerName: booking.customer_name,

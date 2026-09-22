@@ -37,6 +37,12 @@ export type OrderConfirmationEmailResult =
       message: string;
     };
 
+type DeliveryEmailInput = {
+  deliveryMethod: string | null;
+  parcelLockerCode: string | null;
+  deliveryAddress: string | null;
+};
+
 const escapeHtml = (value: string) =>
   value
     .replaceAll("&", "&amp;")
@@ -68,7 +74,7 @@ const getDeliveryLabel = (deliveryMethod: string | null) => {
   return "Do ustalenia";
 };
 
-const getDeliveryDetails = (input: OrderConfirmationEmailInput) => {
+const getDeliveryDetails = (input: DeliveryEmailInput) => {
   if (input.deliveryMethod === "parcel_locker") {
     return input.parcelLockerCode;
   }
@@ -236,6 +242,333 @@ export async function sendOrderConfirmationEmail(
         text: buildTextEmail(input, intendedRecipient),
         html: buildHtmlEmail(input, intendedRecipient),
         tags: [{ name: "email_type", value: "order_confirmation" }],
+      }),
+      cache: "no-store",
+      signal: createOutboundRequestSignal(OUTBOUND_REQUEST_TIMEOUT_MS.email),
+    });
+
+    if (!response.ok) {
+      return {
+        success: false,
+        reason: "request_failed",
+        message: `Resend API zwróciło status ${response.status}.`,
+      };
+    }
+
+    const responseBody = (await response.json()) as { id?: string };
+
+    return {
+      success: true,
+      emailId: responseBody.id ?? null,
+      recipient,
+      testMode,
+    };
+  } catch (error) {
+    return {
+      success: false,
+      reason: "request_failed",
+      message: formatOutboundRequestError("Resend API", error),
+    };
+  }
+}
+
+export type AgreedProjectPaymentEmailInput = {
+  bookingId: number;
+  stripeSessionId: string;
+  customerName: string;
+  customerEmail: string;
+  projectReference: string;
+  amountCents: number;
+};
+
+const buildAgreedProjectPaymentTextEmail = (
+  input: AgreedProjectPaymentEmailInput,
+) =>
+  [
+    `Cześć ${input.customerName}!`,
+    "",
+    "Płatność za uzgodniony projekt została potwierdzona.",
+    "",
+    `Numer zamówienia: #${input.bookingId}`,
+    `Kwota: ${formatPriceCents(input.amountCents)}`,
+    `Projekt: ${input.projectReference}`,
+    "",
+    "Płatność trafiła do pracowni Ruggy. W razie pytań napisz do mnie na Instagramie.",
+    siteConfig.instagram,
+    "",
+    "Twój Wuja Dywaniarz",
+    "Ruggy",
+  ].join("\n");
+
+const buildAgreedProjectPaymentHtmlEmail = (
+  input: AgreedProjectPaymentEmailInput,
+) => `<!doctype html>
+<html lang="pl">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Potwierdzenie płatności #${input.bookingId}</title>
+  </head>
+  <body style="margin:0;background:#f8f3e8;color:#142033;font-family:Arial,sans-serif;">
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#f8f3e8;">
+      <tr>
+        <td align="center" style="padding:32px 16px;">
+          <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:600px;background:#fffaf0;border:2px solid #8b919a;border-radius:24px;overflow:hidden;">
+            <tr>
+              <td style="background:#2864f0;padding:28px 32px;color:#ffffff;">
+                <p style="margin:0 0 8px;font-size:14px;font-weight:700;">ruggy.</p>
+                <h1 style="margin:0;font-size:28px;line-height:1.15;">Płatność przyjęta!</h1>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:32px;">
+                <p style="margin:0 0 12px;font-size:17px;line-height:1.6;">Cześć ${escapeHtml(input.customerName)}!</p>
+                <p style="margin:0 0 24px;font-size:16px;line-height:1.6;color:#374151;">Płatność za uzgodniony projekt została potwierdzona i trafiła do pracowni Ruggy.</p>
+                <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border-collapse:collapse;">
+                  <tr><td style="padding:10px 0;border-bottom:1px solid #c9c4ba;color:#5d6674;font-size:14px;">Numer zamówienia</td><td align="right" style="padding:10px 0;border-bottom:1px solid #c9c4ba;font-size:14px;font-weight:700;">#${input.bookingId}</td></tr>
+                  <tr><td style="padding:10px 0;border-bottom:1px solid #c9c4ba;color:#5d6674;font-size:14px;vertical-align:top;">Projekt</td><td align="right" style="padding:10px 0;border-bottom:1px solid #c9c4ba;font-size:14px;font-weight:700;vertical-align:top;">${escapeHtml(input.projectReference)}</td></tr>
+                  <tr><td style="padding:10px 0;color:#5d6674;font-size:14px;">Kwota</td><td align="right" style="padding:10px 0;font-size:14px;font-weight:700;">${escapeHtml(formatPriceCents(input.amountCents))}</td></tr>
+                </table>
+                <p style="margin:24px 0 0;font-size:14px;line-height:1.6;color:#5d6674;">W razie pytań napisz do mnie na <a href="${siteConfig.instagram}" style="color:#2864f0;font-weight:700;">Instagramie</a>.</p>
+                <p style="margin:28px 0 0;font-size:15px;font-weight:700;line-height:1.5;">Twój Wuja Dywaniarz<br>Ruggy</p>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>`;
+
+export async function sendAgreedProjectPaymentConfirmationEmail(
+  input: AgreedProjectPaymentEmailInput,
+): Promise<OrderConfirmationEmailResult> {
+  const apiKey = process.env.RESEND_API_KEY?.trim();
+  const from = process.env.RESEND_FROM_EMAIL?.trim();
+  const testRecipient = process.env.RESEND_TEST_RECIPIENT?.trim() || null;
+
+  if (!apiKey || !from) {
+    return {
+      success: false,
+      reason: "not_configured",
+      message:
+        "Brakuje RESEND_API_KEY lub RESEND_FROM_EMAIL. Potwierdzenie email nie zostało wysłane.",
+    };
+  }
+
+  const recipient = testRecipient ?? input.customerEmail;
+  const testMode = testRecipient != null;
+  const intendedRecipient = testMode ? input.customerEmail : null;
+  const subject = `${testMode ? "[TEST] " : ""}Potwierdzenie płatności #${input.bookingId} w Ruggy`;
+  const text = buildAgreedProjectPaymentTextEmail(input);
+  const html = buildAgreedProjectPaymentHtmlEmail(input);
+
+  try {
+    const response = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+        "Idempotency-Key": `agreed-project-payment/${input.stripeSessionId}/${
+          testMode ? "test" : "customer"
+        }`,
+      },
+      body: JSON.stringify({
+        from,
+        to: [recipient],
+        subject,
+        text: intendedRecipient
+          ? `${text}\n\nTryb testowy. Docelowy odbiorca: ${intendedRecipient}`
+          : text,
+        html,
+        tags: [{ name: "email_type", value: "agreed_project_payment" }],
+      }),
+      cache: "no-store",
+      signal: createOutboundRequestSignal(OUTBOUND_REQUEST_TIMEOUT_MS.email),
+    });
+
+    if (!response.ok) {
+      return {
+        success: false,
+        reason: "request_failed",
+        message: `Resend API zwróciło status ${response.status}.`,
+      };
+    }
+
+    const responseBody = (await response.json()) as { id?: string };
+
+    return {
+      success: true,
+      emailId: responseBody.id ?? null,
+      recipient,
+      testMode,
+    };
+  } catch (error) {
+    return {
+      success: false,
+      reason: "request_failed",
+      message: formatOutboundRequestError("Resend API", error),
+    };
+  }
+}
+
+export type QuoteRequestConfirmationEmailInput = {
+  bookingId: number;
+  customerName: string;
+  customerEmail: string;
+  rugTypeName: string;
+  rugVariantName: string | null;
+  rugSizeLabel: string;
+  estimatedAmountCents: number;
+  bookingDate: string;
+  deliveryMethod: string | null;
+  parcelLockerCode: string | null;
+  deliveryAddress: string | null;
+};
+
+const buildQuoteRequestTextEmail = (
+  input: QuoteRequestConfirmationEmailInput,
+  intendedRecipient: string | null,
+) => {
+  const productName = [input.rugTypeName, input.rugVariantName]
+    .filter(Boolean)
+    .join(" · ");
+  const deliveryDetails = getDeliveryDetails(input);
+
+  return [
+    `Cześć ${input.customerName}!`,
+    "",
+    "Otrzymałem Twoje zgłoszenie customowego dywanu do wyceny.",
+    "",
+    `Numer zgłoszenia: #${input.bookingId}`,
+    `Dywan: ${productName}`,
+    `Rozmiar: ${input.rugSizeLabel}`,
+    `Szacunkowa kwota: ${formatPriceCents(input.estimatedAmountCents)}`,
+    `Termin: ${formatBookingDate(input.bookingDate)}`,
+    `Dostawa: ${getDeliveryLabel(input.deliveryMethod)}${
+      deliveryDetails ? `, ${deliveryDetails}` : ""
+    }`,
+    "",
+    "Ostateczną cenę i szczegóły realizacji ustalimy z Tobą na Instagramie.",
+    `W razie pytań napisz do mnie: ${siteConfig.instagram}`,
+    ...(intendedRecipient
+      ? ["", `Tryb testowy. Docelowy odbiorca: ${intendedRecipient}`]
+      : []),
+    "",
+    "Twój Wuja Dywaniarz",
+    "Ruggy",
+  ].join("\n");
+};
+
+const buildQuoteRequestHtmlEmail = (
+  input: QuoteRequestConfirmationEmailInput,
+  intendedRecipient: string | null,
+) => {
+  const productName = [input.rugTypeName, input.rugVariantName]
+    .filter(Boolean)
+    .join(" · ");
+  const deliveryDetails = getDeliveryDetails(input);
+  const delivery = `${getDeliveryLabel(input.deliveryMethod)}${
+    deliveryDetails ? `, ${deliveryDetails}` : ""
+  }`;
+  const detailRows = [
+    ["Numer zgłoszenia", `#${input.bookingId}`],
+    ["Dywan", productName],
+    ["Rozmiar", input.rugSizeLabel],
+    ["Szacunkowa kwota", formatPriceCents(input.estimatedAmountCents)],
+    ["Termin", formatBookingDate(input.bookingDate)],
+    ["Dostawa", delivery],
+  ];
+
+  return `<!doctype html>
+<html lang="pl">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Zgłoszenie do wyceny #${input.bookingId}</title>
+  </head>
+  <body style="margin:0;background:#f8f3e8;color:#142033;font-family:Arial,sans-serif;">
+    <div style="display:none;max-height:0;overflow:hidden;">
+      Zgłoszenie customowego dywanu #${input.bookingId} zostało przyjęte do wyceny.
+    </div>
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#f8f3e8;">
+      <tr>
+        <td align="center" style="padding:32px 16px;">
+          <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:600px;background:#fffaf0;border:2px solid #8b919a;border-radius:24px;overflow:hidden;">
+            <tr>
+              <td style="background:#2864f0;padding:28px 32px;color:#ffffff;">
+                <p style="margin:0 0 8px;font-size:14px;font-weight:700;">ruggy.</p>
+                <h1 style="margin:0;font-size:28px;line-height:1.15;">Zgłoszenie przyjęte!</h1>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:32px;">
+                <p style="margin:0 0 12px;font-size:17px;line-height:1.6;">Cześć ${escapeHtml(input.customerName)}!</p>
+                <p style="margin:0 0 24px;font-size:16px;line-height:1.6;color:#374151;">Otrzymałem Twoje zgłoszenie customowego dywanu do wyceny. Ostateczną cenę i szczegóły realizacji ustalimy z Tobą na Instagramie.</p>
+                <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border-collapse:collapse;">
+                  ${detailRows
+                    .map(
+                      ([label, value]) => `<tr>
+                    <td style="padding:10px 0;border-bottom:1px solid #c9c4ba;color:#5d6674;font-size:14px;vertical-align:top;">${escapeHtml(label)}</td>
+                    <td align="right" style="padding:10px 0;border-bottom:1px solid #c9c4ba;color:#142033;font-size:14px;font-weight:700;vertical-align:top;">${escapeHtml(value)}</td>
+                  </tr>`,
+                    )
+                    .join("")}
+                </table>
+                <p style="margin:24px 0 0;font-size:14px;line-height:1.6;color:#5d6674;">W razie pytań napisz do mnie na <a href="${siteConfig.instagram}" style="color:#2864f0;font-weight:700;">Instagramie</a>.</p>
+                ${
+                  intendedRecipient
+                    ? `<p style="margin:24px 0 0;padding:12px 14px;background:#dcecff;border-radius:12px;font-size:13px;line-height:1.5;color:#142033;">Tryb testowy. Docelowy odbiorca: ${escapeHtml(intendedRecipient)}</p>`
+                    : ""
+                }
+                <p style="margin:28px 0 0;font-size:15px;font-weight:700;line-height:1.5;">Twój Wuja Dywaniarz<br>Ruggy</p>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>`;
+};
+
+export async function sendQuoteRequestConfirmationEmail(
+  input: QuoteRequestConfirmationEmailInput,
+): Promise<OrderConfirmationEmailResult> {
+  const apiKey = process.env.RESEND_API_KEY?.trim();
+  const from = process.env.RESEND_FROM_EMAIL?.trim();
+  const testRecipient = process.env.RESEND_TEST_RECIPIENT?.trim() || null;
+
+  if (!apiKey || !from) {
+    return {
+      success: false,
+      reason: "not_configured",
+      message:
+        "Brakuje RESEND_API_KEY lub RESEND_FROM_EMAIL. Potwierdzenie email nie zostało wysłane.",
+    };
+  }
+
+  const recipient = testRecipient ?? input.customerEmail;
+  const testMode = testRecipient != null;
+  const intendedRecipient = testMode ? input.customerEmail : null;
+  const subject = `${testMode ? "[TEST] " : ""}Zgłoszenie do wyceny #${input.bookingId} w Ruggy`;
+  const text = buildQuoteRequestTextEmail(input, intendedRecipient);
+
+  try {
+    const response = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+        "Idempotency-Key": `quote-request/${input.bookingId}`,
+      },
+      body: JSON.stringify({
+        from,
+        to: [recipient],
+        subject,
+        text,
+        html: buildQuoteRequestHtmlEmail(input, intendedRecipient),
+        tags: [{ name: "email_type", value: "quote_request_confirmation" }],
       }),
       cache: "no-store",
       signal: createOutboundRequestSignal(OUTBOUND_REQUEST_TIMEOUT_MS.email),

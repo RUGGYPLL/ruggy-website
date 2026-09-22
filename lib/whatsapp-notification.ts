@@ -7,7 +7,7 @@ import {
 } from "@/lib/outbound-request";
 import { absoluteUrl } from "@/lib/site-config";
 
-type WhatsAppNotificationResult =
+export type WhatsAppNotificationResult =
   | { success: true }
   | {
       success: false;
@@ -17,17 +17,38 @@ type WhatsAppNotificationResult =
 
 const normalizePhoneNumber = (value: string) => value.replace(/\D/g, "");
 
-export async function sendQuoteRequestWhatsAppNotification(
+const getProviderErrorMessage = (body: string) => {
+  if (!body) return null;
+
+  try {
+    const parsed = JSON.parse(body) as {
+      error?: { code?: number; error_user_msg?: string; message?: string };
+    };
+    const providerError = parsed.error;
+    if (!providerError) return body.slice(0, 500);
+
+    return [
+      providerError.code ? `kod ${providerError.code}` : null,
+      providerError.error_user_msg || providerError.message || null,
+    ]
+      .filter(Boolean)
+      .join(": ")
+      .slice(0, 500);
+  } catch {
+    return body.slice(0, 500);
+  }
+};
+
+const sendBookingWhatsAppNotification = async (
   bookingId: number,
-): Promise<WhatsAppNotificationResult> {
+  templateName: string,
+): Promise<WhatsAppNotificationResult> => {
   const accessToken = process.env.WHATSAPP_ACCESS_TOKEN?.trim();
   const phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID?.trim();
   const recipientNumber = normalizePhoneNumber(
     process.env.WHATSAPP_RECIPIENT_NUMBER ?? "",
   );
   const graphApiVersion = process.env.WHATSAPP_GRAPH_API_VERSION?.trim();
-  const templateName =
-    process.env.WHATSAPP_TEMPLATE_NAME?.trim() || "new_quote_request";
   const templateLanguage =
     process.env.WHATSAPP_TEMPLATE_LANGUAGE?.trim() || "pl";
 
@@ -96,10 +117,14 @@ export async function sendQuoteRequestWhatsAppNotification(
     );
 
     if (!response.ok) {
+      const responseBody = await response.text().catch(() => "");
+      const providerError = getProviderErrorMessage(responseBody);
       return {
         success: false,
         reason: "request_failed",
-        message: `WhatsApp API zwróciło status ${response.status}.`,
+        message: `WhatsApp API zwróciło status ${response.status}.${
+          providerError ? ` Szczegóły: ${providerError}` : ""
+        }`,
       };
     }
 
@@ -111,4 +136,20 @@ export async function sendQuoteRequestWhatsAppNotification(
       message: formatOutboundRequestError("WhatsApp API", error),
     };
   }
+};
+
+export function sendQuoteRequestWhatsAppNotification(bookingId: number) {
+  return sendBookingWhatsAppNotification(
+    bookingId,
+    process.env.WHATSAPP_TEMPLATE_NAME?.trim() || "new_quote_request",
+  );
+}
+
+export function sendAgreedProjectPaymentWhatsAppNotification(bookingId: number) {
+  return sendBookingWhatsAppNotification(
+    bookingId,
+    process.env.WHATSAPP_PAID_TEMPLATE_NAME?.trim() ||
+      process.env.WHATSAPP_TEMPLATE_NAME?.trim() ||
+      "new_paid_project",
+  );
 }

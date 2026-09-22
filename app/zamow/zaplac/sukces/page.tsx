@@ -1,4 +1,4 @@
-import { verifyAgreedProjectPayment } from "@/lib/agreed-project-payment";
+import { fulfillAgreedProjectPayment } from "@/lib/fulfill-agreed-project-payment";
 import { CheckCircle2, Clock3, TriangleAlert } from "lucide-react";
 import Link from "next/link";
 
@@ -18,7 +18,7 @@ export default async function AgreedProjectPaymentSuccessPage({
     ? params.session_id[0]
     : params.session_id;
   const result = sessionId
-    ? await verifyAgreedProjectPayment(sessionId)
+    ? await fulfillAgreedProjectPayment(sessionId)
     : {
         success: false as const,
         reason: "invalid_session" as const,

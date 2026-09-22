@@ -1,4 +1,5 @@
 import { getStripe } from "@/lib/stripe";
+import { fulfillAgreedProjectPayment } from "@/lib/fulfill-agreed-project-payment";
 import { fulfillCheckout } from "@/lib/fulfill-checkout";
 import { headers } from "next/headers";
 import { NextResponse } from "next/server";
@@ -51,6 +52,15 @@ export async function POST(request: Request) {
     const session = event.data.object;
 
     if (session.metadata?.checkoutKind === "agreed_project_payment") {
+      const result = await fulfillAgreedProjectPayment(session.id);
+
+      if (!result.success && result.reason !== "not_paid") {
+        return NextResponse.json(
+          { error: result.message },
+          { status: 500 },
+        );
+      }
+
       return NextResponse.json({ received: true });
     }
 

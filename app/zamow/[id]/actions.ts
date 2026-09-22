@@ -41,6 +41,7 @@ import {
 } from "@/lib/security/reference-image-proof";
 import { getCheckoutReturnOrigin } from "@/lib/security/origin";
 import { headers } from "next/headers";
+import { sendQuoteRequestConfirmationEmail } from "@/lib/order-confirmation-email";
 import { sendQuoteRequestWhatsAppNotification } from "@/lib/whatsapp-notification";
 
 const REFERENCE_IMAGES_BUCKET = "booking-reference-images";
@@ -502,8 +503,66 @@ export async function createContactBooking(input: unknown) {
   }
 
   const bookingId = Number(createdBooking.id);
+  const storedPriceCents =
+    addAntiSlipMatPrice(estimatedPriceCents, booking.antiSlipMat) +
+    (calculateDeliveryCostCents(
+      booking.deliveryMethod,
+      estimatedPriceCents,
+    ) ?? 0);
+  const emailResult = await sendQuoteRequestConfirmationEmail({
+    bookingId,
+    customerName: booking.customerName,
+    customerEmail: booking.customerEmail,
+    rugTypeName: rugType.name,
+    rugVariantName: rugVariant?.name ?? null,
+    rugSizeLabel: appendAntiSlipMatLabel(
+      formatCustomRugSizeLabel(
+        booking.customWidthCm,
+        booking.customHeightCm,
+      ),
+      booking.antiSlipMat,
+    ),
+    estimatedAmountCents: storedPriceCents,
+    bookingDate: booking.pickupDate,
+    deliveryMethod: booking.deliveryMethod,
+    parcelLockerCode: formatParcelLocker(booking) || null,
+    deliveryAddress: formatDeliveryAddress(booking) || null,
+  });
+
+  if (!emailResult.success) {
+    console.error(
+      "Nie udało się wysłać potwierdzenia zgłoszenia wyceny:",
+      JSON.stringify(emailResult),
+    );
+  }
+
   const notificationResult =
     await sendQuoteRequestWhatsAppNotification(bookingId);
+
+  const notificationStatus = notificationResult.success ? "sent" : "failed";
+  const { error: notificationTrackingError } = await supabase
+    .from("bookings")
+    .update({
+      whatsapp_notification_status: notificationStatus,
+      whatsapp_notification_error: notificationResult.success
+        ? null
+        : notificationResult.message,
+      whatsapp_notification_sent_at: notificationResult.success
+        ? new Date().toISOString()
+        : null,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", bookingId);
+
+  if (notificationTrackingError) {
+    console.error(
+      "Nie udało się zapisać statusu powiadomienia WhatsApp:",
+      JSON.stringify({
+        code: notificationTrackingError.code,
+        message: notificationTrackingError.message,
+      }),
+    );
+  }
 
   if (!notificationResult.success) {
     console.error(
@@ -515,6 +574,7 @@ export async function createContactBooking(input: unknown) {
   return {
     success: true,
     bookingId,
+    emailSent: emailResult.success,
     notificationSent: notificationResult.success,
   };
 }

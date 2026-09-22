@@ -54,6 +54,11 @@ export type AdminBooking = {
   rugTypeName: string | null;
   rugVariantName: string | null;
   rugSizeLabel: string | null;
+  paymentKind: string;
+  projectReference: string | null;
+  whatsappNotificationStatus: string;
+  whatsappNotificationError: string | null;
+  whatsappNotificationSentAt: string | null;
   priceCents: number | null;
   customerName: string | null;
   customerEmail: string | null;
@@ -161,13 +166,17 @@ const getDeliveryLabel = (method: string | null) => {
 };
 
 const getRugDetails = (booking: AdminBooking) =>
-  [
-    booking.rugTypeName || "Dywan",
-    booking.rugVariantName,
-    booking.rugSizeLabel || "Brak rozmiaru",
-  ]
-    .filter(Boolean)
-    .join(" · ");
+  booking.paymentKind === "agreed_project_payment"
+    ? ["Uzgodniony projekt", booking.projectReference]
+        .filter(Boolean)
+        .join(" · ")
+    : [
+        booking.rugTypeName || "Dywan",
+        booking.rugVariantName,
+        booking.rugSizeLabel || "Brak rozmiaru",
+      ]
+        .filter(Boolean)
+        .join(" · ");
 
 export default function AdminDashboardClient({
   initialBookings,
@@ -255,6 +264,7 @@ export default function AdminDashboardClient({
         booking.rugTypeName,
         booking.rugVariantName,
         booking.rugSizeLabel,
+        booking.projectReference,
         String(booking.id),
       ]
         .filter(Boolean)
@@ -792,12 +802,7 @@ export default function AdminDashboardClient({
                         <StatusBadge status={booking.status} />
                       </span>
                       <span className="mt-1 block truncate text-xs text-[var(--ruggy-muted)]">
-                        #{booking.id} · {booking.rugTypeName || "Dywan"}
-                        {booking.rugVariantName
-                          ? ` · ${booking.rugVariantName}`
-                          : ""}{" "}
-                        ·{" "}
-                        {formatShortDate(booking.bookingDate)}
+                        #{booking.id} · {getRugDetails(booking)} · {formatShortDate(booking.bookingDate)}
                       </span>
                     </span>
                     <span className="shrink-0 text-right">
@@ -1303,6 +1308,13 @@ function BookingDrawer({
                 label="Rozmiar"
                 value={booking.rugSizeLabel || "Brak danych"}
               />
+              {booking.projectReference ? (
+                <DetailRow
+                  icon={Package}
+                  label="Opis projektu"
+                  value={booking.projectReference}
+                />
+              ) : null}
               <DetailRow
                 icon={CalendarDays}
                 label="Termin wykonania"
@@ -1382,6 +1394,21 @@ function BookingDrawer({
 
           <DetailSection title="Płatność i system">
             <div className="grid gap-4 sm:grid-cols-2">
+              <DetailRow
+                icon={Mail}
+                label="WhatsApp właściciela"
+                value={
+                  booking.whatsappNotificationStatus === "sent"
+                    ? `Wysłano${
+                        booking.whatsappNotificationSentAt
+                          ? ` · ${formatDateTime(booking.whatsappNotificationSentAt)}`
+                          : ""
+                      }`
+                    : booking.whatsappNotificationStatus === "failed"
+                      ? `Błąd: ${booking.whatsappNotificationError || "brak szczegółów"}`
+                      : "Nie wysłano"
+                }
+              />
               <DetailRow
                 icon={Clock3}
                 label="Utworzono"

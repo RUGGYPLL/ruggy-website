@@ -29,6 +29,10 @@ widoczność strony publicznej z poziomu `/admin/dashboard`. Podczas przerwy
 strony publiczne pokazują `/przerwa-techniczna`, a panel administratora i
 webhook Stripe nadal działają.
 
+Migracja `20260917_add_agreed_project_payments.sql` dodaje obsługę płatności za
+uzgodnione projekty oraz zapis statusu powiadomień WhatsApp. Zastosuj ją przed
+wdrożeniem kodu korzystającego z tych pól.
+
 ## Zdjęcia kategorii
 
 Okładkę i przykładowe realizacje wgrywasz w `/admin/dywany` — przy tworzeniu
@@ -98,8 +102,10 @@ nadawcę w domenie Ruggy i usuń `RESEND_TEST_RECIPIENT`.
 
 ## Powiadomienia WhatsApp
 
-Powiadomienia o nowych zgłoszeniach do wyceny korzystają z oficjalnego Meta
-WhatsApp Cloud API. W WhatsApp Manager utwórz i zatwierdź szablon typu Utility:
+Powiadomienia o nowych zgłoszeniach do wyceny oraz opłaconych projektach
+korzystają z oficjalnego Meta WhatsApp Cloud API. W WhatsApp Manager utwórz i
+zatwierdź szablon typu Utility. Po każdym zgłoszeniu do wyceny klient dostaje
+też potwierdzenie email przez Resend.
 
 ```text
 Nazwa: new_quote_request
@@ -115,12 +121,16 @@ WHATSAPP_PHONE_NUMBER_ID=
 WHATSAPP_RECIPIENT_NUMBER=48XXXXXXXXX
 WHATSAPP_GRAPH_API_VERSION=vXX.X
 WHATSAPP_TEMPLATE_NAME=new_quote_request
+WHATSAPP_PAID_TEMPLATE_NAME=
 WHATSAPP_TEMPLATE_LANGUAGE=pl
 ```
 
 Numer odbiorcy podaj z kodem kraju, bez znaku `+`. Wersję Graph API wpisz
 zgodnie z wersją wybraną w aplikacji Meta. `NEXT_PUBLIC_SITE_URL` musi
 wskazywać publiczną domenę, ponieważ jest używany w linku do zamówienia.
+`WHATSAPP_PAID_TEMPLATE_NAME` może wskazywać osobny zatwierdzony szablon dla
+opłaconych projektów. Jeśli pozostanie puste, aplikacja użyje
+`WHATSAPP_TEMPLATE_NAME`.
 
 ## Pozostałe integracje
 
