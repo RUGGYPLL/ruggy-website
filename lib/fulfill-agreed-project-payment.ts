@@ -2,7 +2,10 @@ import "server-only";
 
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getStripe } from "@/lib/stripe";
-import { sendAgreedProjectPaymentConfirmationEmail } from "@/lib/order-confirmation-email";
+import {
+  sendAgreedProjectPaymentConfirmationEmail,
+  sendOwnerBookingNotificationEmail,
+} from "@/lib/order-confirmation-email";
 import { sendAgreedProjectPaymentWhatsAppNotification } from "@/lib/whatsapp-notification";
 
 export type AgreedProjectPaymentFulfillmentResult =
@@ -206,6 +209,31 @@ export async function fulfillAgreedProjectPayment(
     console.error(
       "Nie udało się wysłać potwierdzenia płatności:",
       JSON.stringify(emailResult),
+    );
+  }
+
+  const ownerEmailResult = await sendOwnerBookingNotificationEmail({
+    bookingId,
+    orderKind: "agreed_project_payment",
+    customerName,
+    customerEmail,
+    customerPhone: null,
+    rugTypeName: "Uzgodniony projekt",
+    rugVariantName: null,
+    rugSizeLabel: null,
+    amountCents: session.amount_total,
+    bookingDate: null,
+    deliveryMethod: null,
+    parcelLockerCode: null,
+    deliveryAddress: null,
+    notes: null,
+    projectReference,
+  });
+
+  if (!ownerEmailResult.success) {
+    console.error(
+      "Nie udało się wysłać powiadomienia email do właściciela:",
+      JSON.stringify(ownerEmailResult),
     );
   }
 

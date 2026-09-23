@@ -4,6 +4,7 @@ vi.mock("server-only", () => ({}));
 
 import {
   sendAgreedProjectPaymentConfirmationEmail,
+  sendOwnerBookingNotificationEmail,
   sendQuoteRequestConfirmationEmail,
 } from "./order-confirmation-email";
 
@@ -116,6 +117,61 @@ describe("quote request confirmation email", () => {
     expect(payload.text).toContain("437");
     expect(request[1].headers["Idempotency-Key"]).toBe(
       "quote-request/84",
+    );
+  });
+});
+
+describe("owner booking notification email", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.stubGlobal("fetch", fetchMock);
+    process.env.RESEND_API_KEY = "re_test";
+    process.env.RESEND_FROM_EMAIL = "Ruggy <zamowienia@example.com>";
+    delete process.env.RESEND_OWNER_EMAIL;
+    delete process.env.RESEND_TEST_RECIPIENT;
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: vi.fn().mockResolvedValue({ id: "email_owner_123" }),
+    });
+  });
+
+  it("sends detailed quote information to the owner address", async () => {
+    process.env.RESEND_TEST_RECIPIENT = "test-recipient@example.com";
+
+    await expect(
+      sendOwnerBookingNotificationEmail({
+        bookingId: 85,
+        orderKind: "quote_request",
+        customerName: "Jan Kowalski",
+        customerEmail: "klient@example.com",
+        customerPhone: "+48 600 000 000",
+        rugTypeName: "Custom",
+        rugVariantName: "Logo",
+        rugSizeLabel: "120 × 80 cm",
+        amountCents: 43700,
+        bookingDate: "2026-09-25",
+        deliveryMethod: "courier",
+        parcelLockerCode: null,
+        deliveryAddress: "ul. Testowa 1, Warszawa",
+        notes: "Proszę o kontakt na Instagramie",
+        projectReference: null,
+      }),
+    ).resolves.toEqual({
+      success: true,
+      emailId: "email_owner_123",
+      recipient: "sklep@ruggy.pl",
+      testMode: false,
+    });
+
+    const request = fetchMock.mock.calls[0];
+    const payload = JSON.parse(request[1].body as string);
+
+    expect(payload.to).toEqual(["sklep@ruggy.pl"]);
+    expect(payload.subject).toContain("#85");
+    expect(payload.text).toContain("klient@example.com");
+    expect(payload.text).toContain("Proszę o kontakt na Instagramie");
+    expect(request[1].headers["Idempotency-Key"]).toBe(
+      "owner-booking-notification/quote_request/85",
     );
   });
 });

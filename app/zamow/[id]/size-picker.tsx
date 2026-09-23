@@ -205,6 +205,7 @@ export const SizePicker = ({
   );
   const customPriceCents = calculateCustomRugPriceCents(
     booking.customHeightCm,
+    booking.customWidthCm,
   );
 
   // Report the resolved selection (real size label/price + chosen subrodzaj) up
@@ -415,10 +416,12 @@ export const SizePicker = ({
 
           <div className="mt-5 flex flex-col gap-3 rounded-2xl border-2 border-[var(--ruggy-ink)] bg-[var(--ruggy-surface)] p-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <p className="text-xs font-black uppercase tracking-[0.14em] text-[var(--ruggy-muted)]">Podana wysokość</p>
+              <p className="text-xs font-black uppercase tracking-[0.14em] text-[var(--ruggy-muted)]">Podany rozmiar</p>
               <p className="mt-1 text-xl font-black text-[var(--ruggy-ink)]">
                 {booking.customHeightCm != null
-                  ? `${booking.customHeightCm} cm`
+                  ? booking.customWidthCm != null
+                    ? `${booking.customWidthCm} × ${booking.customHeightCm} cm`
+                    : `wysokość ${booking.customHeightCm} cm`
                   : "Wpisz wysokość"}
               </p>
             </div>

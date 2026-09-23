@@ -449,6 +449,7 @@ export default function ProductPage({
 
   const customPriceCents = calculateCustomRugPriceCents(
     booking.customHeightCm,
+    booking.customWidthCm,
   );
   // Ready sizes have a firm price; a custom rug only has the estimate, which is
   // still what decides whether the order clears the free-delivery threshold.

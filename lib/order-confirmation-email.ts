@@ -7,7 +7,7 @@ import {
   formatOutboundRequestError,
   OUTBOUND_REQUEST_TIMEOUT_MS,
 } from "@/lib/outbound-request";
-import { siteConfig } from "@/lib/site-config";
+import { absoluteUrl, siteConfig } from "@/lib/site-config";
 
 export type OrderConfirmationEmailInput = {
   bookingId: number;
@@ -569,6 +569,235 @@ export async function sendQuoteRequestConfirmationEmail(
         text,
         html: buildQuoteRequestHtmlEmail(input, intendedRecipient),
         tags: [{ name: "email_type", value: "quote_request_confirmation" }],
+      }),
+      cache: "no-store",
+      signal: createOutboundRequestSignal(OUTBOUND_REQUEST_TIMEOUT_MS.email),
+    });
+
+    if (!response.ok) {
+      return {
+        success: false,
+        reason: "request_failed",
+        message: `Resend API zwróciło status ${response.status}.`,
+      };
+    }
+
+    const responseBody = (await response.json()) as { id?: string };
+
+    return {
+      success: true,
+      emailId: responseBody.id ?? null,
+      recipient,
+      testMode,
+    };
+  } catch (error) {
+    return {
+      success: false,
+      reason: "request_failed",
+      message: formatOutboundRequestError("Resend API", error),
+    };
+  }
+}
+
+export type OwnerBookingNotificationEmailInput = {
+  bookingId: number;
+  orderKind: "catalog_order" | "quote_request" | "agreed_project_payment";
+  customerName: string;
+  customerEmail: string;
+  customerPhone: string | null;
+  rugTypeName: string;
+  rugVariantName: string | null;
+  rugSizeLabel: string | null;
+  amountCents: number | null;
+  bookingDate: string | null;
+  deliveryMethod: string | null;
+  parcelLockerCode: string | null;
+  deliveryAddress: string | null;
+  notes: string | null;
+  projectReference: string | null;
+};
+
+const ownerOrderKindLabels: Record<
+  OwnerBookingNotificationEmailInput["orderKind"],
+  string
+> = {
+  catalog_order: "Zamówienie opłacone online",
+  quote_request: "Nowe zgłoszenie do wyceny",
+  agreed_project_payment: "Opłacony uzgodniony projekt",
+};
+
+const buildOwnerBookingNotificationText = (
+  input: OwnerBookingNotificationEmailInput,
+  intendedRecipient: string | null,
+) => {
+  const productName = [input.rugTypeName, input.rugVariantName]
+    .filter(Boolean)
+    .join(" · ");
+  const deliveryDetails = getDeliveryDetails(input);
+  const delivery = `${getDeliveryLabel(input.deliveryMethod)}${
+    deliveryDetails ? `, ${deliveryDetails}` : ""
+  }`;
+
+  return [
+    ownerOrderKindLabels[input.orderKind],
+    "",
+    `Numer: #${input.bookingId}`,
+    `Klient: ${input.customerName}`,
+    `E-mail: ${input.customerEmail}`,
+    `Telefon: ${input.customerPhone || "Brak danych"}`,
+    `Dywan: ${productName}`,
+    `Rozmiar: ${input.rugSizeLabel || "Brak danych"}`,
+    `Kwota: ${
+      input.amountCents == null
+        ? "Do ustalenia"
+        : formatPriceCents(input.amountCents)
+    }`,
+    `Termin: ${
+      input.bookingDate ? formatBookingDate(input.bookingDate) : "Do ustalenia"
+    }`,
+    `Dostawa: ${delivery}`,
+    ...(input.projectReference
+      ? [`Projekt: ${input.projectReference}`]
+      : []),
+    ...(input.notes ? ["", `Uwagi: ${input.notes}`] : []),
+    "",
+    `Otwórz zamówienie: ${absoluteUrl(
+      `/admin/dashboard?booking=${encodeURIComponent(String(input.bookingId))}`,
+    )}`,
+    ...(intendedRecipient
+      ? ["", `Tryb testowy. Docelowy odbiorca: ${intendedRecipient}`]
+      : []),
+  ].join("\n");
+};
+
+const buildOwnerBookingNotificationHtml = (
+  input: OwnerBookingNotificationEmailInput,
+  intendedRecipient: string | null,
+) => {
+  const productName = [input.rugTypeName, input.rugVariantName]
+    .filter(Boolean)
+    .join(" · ");
+  const deliveryDetails = getDeliveryDetails(input);
+  const delivery = `${getDeliveryLabel(input.deliveryMethod)}${
+    deliveryDetails ? `, ${deliveryDetails}` : ""
+  }`;
+  const adminUrl = absoluteUrl(
+    `/admin/dashboard?booking=${encodeURIComponent(String(input.bookingId))}`,
+  );
+  const detailRows = [
+    ["Numer", `#${input.bookingId}`],
+    ["Klient", input.customerName],
+    ["E-mail", input.customerEmail],
+    ["Telefon", input.customerPhone || "Brak danych"],
+    ["Dywan", productName],
+    ["Rozmiar", input.rugSizeLabel || "Brak danych"],
+    [
+      "Kwota",
+      input.amountCents == null
+        ? "Do ustalenia"
+        : formatPriceCents(input.amountCents),
+    ],
+    [
+      "Termin",
+      input.bookingDate ? formatBookingDate(input.bookingDate) : "Do ustalenia",
+    ],
+    ["Dostawa", delivery],
+    ...(input.projectReference
+      ? [["Projekt", input.projectReference] as [string, string]]
+      : []),
+  ];
+
+  return `<!doctype html>
+<html lang="pl">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>${escapeHtml(ownerOrderKindLabels[input.orderKind])} #${input.bookingId}</title>
+  </head>
+  <body style="margin:0;background:#f8f3e8;color:#142033;font-family:Arial,sans-serif;">
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#f8f3e8;">
+      <tr>
+        <td align="center" style="padding:32px 16px;">
+          <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:640px;background:#fffaf0;border:2px solid #8b919a;border-radius:24px;overflow:hidden;">
+            <tr>
+              <td style="background:#2864f0;padding:28px 32px;color:#ffffff;">
+                <p style="margin:0 0 8px;font-size:14px;font-weight:700;">ruggy.</p>
+                <h1 style="margin:0;font-size:26px;line-height:1.15;">${escapeHtml(ownerOrderKindLabels[input.orderKind])}</h1>
+                <p style="margin:12px 0 0;font-size:15px;line-height:1.5;">Zamówienie #${input.bookingId}</p>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:32px;">
+                <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border-collapse:collapse;">
+                  ${detailRows
+                    .map(
+                      ([label, value]) => `<tr>
+                    <td style="padding:10px 0;border-bottom:1px solid #c9c4ba;color:#5d6674;font-size:14px;vertical-align:top;">${escapeHtml(label)}</td>
+                    <td align="right" style="padding:10px 0;border-bottom:1px solid #c9c4ba;color:#142033;font-size:14px;font-weight:700;vertical-align:top;">${escapeHtml(value)}</td>
+                  </tr>`,
+                    )
+                    .join("")}
+                </table>
+                ${
+                  input.notes
+                    ? `<p style="margin:24px 0 0;padding:14px;background:#eef3ff;border-radius:12px;font-size:14px;line-height:1.6;color:#374151;"><strong>Uwagi:</strong><br>${escapeHtml(input.notes)}</p>`
+                    : ""
+                }
+                <p style="margin:28px 0 0;"><a href="${adminUrl}" style="display:inline-block;background:#2864f0;color:#ffffff;text-decoration:none;border-radius:12px;padding:13px 18px;font-size:14px;font-weight:700;">Otwórz w panelu admina</a></p>
+                ${
+                  intendedRecipient
+                    ? `<p style="margin:24px 0 0;padding:12px 14px;background:#dcecff;border-radius:12px;font-size:13px;line-height:1.5;color:#142033;">Tryb testowy. Docelowy odbiorca: ${escapeHtml(intendedRecipient)}</p>`
+                    : ""
+                }
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>`;
+};
+
+export async function sendOwnerBookingNotificationEmail(
+  input: OwnerBookingNotificationEmailInput,
+): Promise<OrderConfirmationEmailResult> {
+  const apiKey = process.env.RESEND_API_KEY?.trim();
+  const from = process.env.RESEND_FROM_EMAIL?.trim();
+  const ownerEmail =
+    process.env.RESEND_OWNER_EMAIL?.trim() || "sklep@ruggy.pl";
+
+  if (!apiKey || !from) {
+    return {
+      success: false,
+      reason: "not_configured",
+      message:
+        "Brakuje RESEND_API_KEY lub RESEND_FROM_EMAIL. Powiadomienie właściciela nie zostało wysłane.",
+    };
+  }
+
+  // Owner alerts must reach the owner even when customer email testing is
+  // enabled with RESEND_TEST_RECIPIENT.
+  const recipient = ownerEmail;
+  const testMode = false;
+  const intendedRecipient = null;
+  const subject = `${testMode ? "[TEST] " : ""}${ownerOrderKindLabels[input.orderKind]} #${input.bookingId}`;
+
+  try {
+    const response = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+        "Idempotency-Key": `owner-booking-notification/${input.orderKind}/${input.bookingId}`,
+      },
+      body: JSON.stringify({
+        from,
+        to: [recipient],
+        subject,
+        text: buildOwnerBookingNotificationText(input, intendedRecipient),
+        html: buildOwnerBookingNotificationHtml(input, intendedRecipient),
+        tags: [{ name: "email_type", value: "owner_booking_notification" }],
       }),
       cache: "no-store",
       signal: createOutboundRequestSignal(OUTBOUND_REQUEST_TIMEOUT_MS.email),

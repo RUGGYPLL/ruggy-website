@@ -4,7 +4,10 @@ import { isValidDateKey } from "@/lib/booking-date";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getStripe } from "@/lib/stripe";
 import { appendAntiSlipMatLabel } from "@/lib/order-addons";
-import { sendOrderConfirmationEmail } from "@/lib/order-confirmation-email";
+import {
+  sendOrderConfirmationEmail,
+  sendOwnerBookingNotificationEmail,
+} from "@/lib/order-confirmation-email";
 
 export type FulfillmentResult =
   | { success: true }
@@ -172,6 +175,31 @@ export async function fulfillCheckout(
     console.error(
       "Nie udało się wysłać potwierdzenia zamówienia:",
       JSON.stringify(emailResult),
+    );
+  }
+
+  const ownerEmailResult = await sendOwnerBookingNotificationEmail({
+    bookingId,
+    orderKind: "catalog_order",
+    customerName: metadata.customerName,
+    customerEmail,
+    customerPhone: optionalMetadata(metadata.customerPhone),
+    rugTypeName: metadata.rugTypeName,
+    rugVariantName,
+    rugSizeLabel,
+    amountCents: session.amount_total,
+    bookingDate,
+    deliveryMethod,
+    parcelLockerCode,
+    deliveryAddress,
+    notes: optionalMetadata(metadata.customerNotes),
+    projectReference: null,
+  });
+
+  if (!ownerEmailResult.success) {
+    console.error(
+      "Nie udało się wysłać powiadomienia email do właściciela:",
+      JSON.stringify(ownerEmailResult),
     );
   }
 

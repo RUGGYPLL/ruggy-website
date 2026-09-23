@@ -41,7 +41,10 @@ import {
 } from "@/lib/security/reference-image-proof";
 import { getCheckoutReturnOrigin } from "@/lib/security/origin";
 import { headers } from "next/headers";
-import { sendQuoteRequestConfirmationEmail } from "@/lib/order-confirmation-email";
+import {
+  sendOwnerBookingNotificationEmail,
+  sendQuoteRequestConfirmationEmail,
+} from "@/lib/order-confirmation-email";
 import { sendQuoteRequestWhatsAppNotification } from "@/lib/whatsapp-notification";
 
 const REFERENCE_IMAGES_BUCKET = "booking-reference-images";
@@ -436,12 +439,13 @@ export async function createContactBooking(input: unknown) {
 
   const estimatedPriceCents = calculateCustomRugPriceCents(
     booking.customHeightCm,
+    booking.customWidthCm,
   );
 
   if (estimatedPriceCents == null) {
     return {
       success: false,
-      message: "Wysokość dywanu jest poza dozwolonym zakresem.",
+      message: "Wymiary dywanu są poza dozwolonym zakresem.",
     };
   }
 
@@ -533,6 +537,37 @@ export async function createContactBooking(input: unknown) {
     console.error(
       "Nie udało się wysłać potwierdzenia zgłoszenia wyceny:",
       JSON.stringify(emailResult),
+    );
+  }
+
+  const ownerEmailResult = await sendOwnerBookingNotificationEmail({
+    bookingId,
+    orderKind: "quote_request",
+    customerName: booking.customerName,
+    customerEmail: booking.customerEmail,
+    customerPhone: booking.customerPhone?.trim() || null,
+    rugTypeName: rugType.name,
+    rugVariantName: rugVariant?.name ?? null,
+    rugSizeLabel: appendAntiSlipMatLabel(
+      formatCustomRugSizeLabel(
+        booking.customWidthCm,
+        booking.customHeightCm,
+      ),
+      booking.antiSlipMat,
+    ),
+    amountCents: storedPriceCents,
+    bookingDate: booking.pickupDate,
+    deliveryMethod: booking.deliveryMethod,
+    parcelLockerCode: formatParcelLocker(booking) || null,
+    deliveryAddress: formatDeliveryAddress(booking) || null,
+    notes: booking.customerNotes?.trim() || null,
+    projectReference: null,
+  });
+
+  if (!ownerEmailResult.success) {
+    console.error(
+      "Nie udało się wysłać powiadomienia email do właściciela:",
+      JSON.stringify(ownerEmailResult),
     );
   }
 

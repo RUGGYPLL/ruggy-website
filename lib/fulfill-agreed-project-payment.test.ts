@@ -12,6 +12,7 @@ vi.mock("@/lib/supabase/admin", () => ({
 
 vi.mock("@/lib/order-confirmation-email", () => ({
   sendAgreedProjectPaymentConfirmationEmail: vi.fn(),
+  sendOwnerBookingNotificationEmail: vi.fn(),
 }));
 
 vi.mock("@/lib/whatsapp-notification", () => ({
@@ -20,13 +21,17 @@ vi.mock("@/lib/whatsapp-notification", () => ({
 
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getStripe } from "@/lib/stripe";
-import { sendAgreedProjectPaymentConfirmationEmail } from "@/lib/order-confirmation-email";
+import {
+  sendAgreedProjectPaymentConfirmationEmail,
+  sendOwnerBookingNotificationEmail,
+} from "@/lib/order-confirmation-email";
 import { sendAgreedProjectPaymentWhatsAppNotification } from "@/lib/whatsapp-notification";
 import { fulfillAgreedProjectPayment } from "./fulfill-agreed-project-payment";
 
 const getStripeMock = vi.mocked(getStripe);
 const createAdminClientMock = vi.mocked(createAdminClient);
 const sendEmailMock = vi.mocked(sendAgreedProjectPaymentConfirmationEmail);
+const sendOwnerEmailMock = vi.mocked(sendOwnerBookingNotificationEmail);
 const sendWhatsAppMock = vi.mocked(
   sendAgreedProjectPaymentWhatsAppNotification,
 );
@@ -98,6 +103,12 @@ describe("fulfillAgreedProjectPayment", () => {
       recipient: "klient@example.com",
       testMode: false,
     });
+    sendOwnerEmailMock.mockResolvedValue({
+      success: true,
+      emailId: "owner_email_123",
+      recipient: "sklep@ruggy.pl",
+      testMode: false,
+    });
     sendWhatsAppMock.mockResolvedValue({ success: true });
   });
 
@@ -125,6 +136,13 @@ describe("fulfillAgreedProjectPayment", () => {
     expect(sendEmailMock).toHaveBeenCalledWith(
       expect.objectContaining({ bookingId: 91, amountCents: 22500 }),
     );
+    expect(sendOwnerEmailMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        bookingId: 91,
+        orderKind: "agreed_project_payment",
+        projectReference: "Dywan z logo ustalony na Instagramie",
+      }),
+    );
     expect(sendWhatsAppMock).toHaveBeenCalledWith(91);
   });
 
@@ -136,6 +154,7 @@ describe("fulfillAgreedProjectPayment", () => {
     );
 
     expect(sendEmailMock).not.toHaveBeenCalled();
+    expect(sendOwnerEmailMock).not.toHaveBeenCalled();
     expect(sendWhatsAppMock).not.toHaveBeenCalled();
   });
 

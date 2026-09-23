@@ -86,7 +86,13 @@ wiadomość przez Resend API. Ustaw lokalnie i na Vercelu:
 ```env
 RESEND_API_KEY=re_...
 RESEND_FROM_EMAIL=Ruggy <zamowienia@ruggy.pl>
+RESEND_OWNER_EMAIL=sklep@ruggy.pl
 ```
+
+Po każdym opłaconym zamówieniu, zgłoszeniu do wyceny oraz opłaconym
+uzgodnionym projekcie aplikacja wysyła szczegółowe powiadomienie do właściciela
+na `RESEND_OWNER_EMAIL`. Jeśli zmienna jest pusta, używany jest adres
+`sklep@ruggy.pl`.
 
 Do testów przed weryfikacją domeny użyj nadawcy Resend i skieruj wszystkie
 wiadomości na adres właściciela konta Resend:

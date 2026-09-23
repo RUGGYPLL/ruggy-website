@@ -1,10 +1,12 @@
 export const CUSTOM_RUG_MIN_PRICE_CENTS = 24900;
 export const CUSTOM_RUG_RATE_CENTS_PER_HEIGHT_CM = 420;
+export const CUSTOM_RUG_BASE_WIDTH_CM = 100;
 export const CUSTOM_RUG_MIN_DIMENSION_CM = 20;
 export const CUSTOM_RUG_MAX_DIMENSION_CM = 300;
 
 export function calculateCustomRugPriceCents(
   heightCm: number | null | undefined,
+  widthCm: number | null | undefined = null,
 ) {
   if (
     !Number.isFinite(heightCm) ||
@@ -15,9 +17,22 @@ export function calculateCustomRugPriceCents(
     return null;
   }
 
+  if (
+    widthCm != null &&
+    (!Number.isFinite(widthCm) ||
+      widthCm < CUSTOM_RUG_MIN_DIMENSION_CM ||
+      widthCm > CUSTOM_RUG_MAX_DIMENSION_CM)
+  ) {
+    return null;
+  }
+
   const rawPriceCents =
     CUSTOM_RUG_MIN_PRICE_CENTS +
-    heightCm * CUSTOM_RUG_RATE_CENTS_PER_HEIGHT_CM;
+    (widthCm == null
+      ? heightCm * CUSTOM_RUG_RATE_CENTS_PER_HEIGHT_CM
+      : (widthCm / CUSTOM_RUG_BASE_WIDTH_CM) *
+        heightCm *
+        CUSTOM_RUG_RATE_CENTS_PER_HEIGHT_CM);
 
   return Math.ceil(rawPriceCents / 1000) * 1000;
 }

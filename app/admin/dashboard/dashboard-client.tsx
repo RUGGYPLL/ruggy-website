@@ -45,6 +45,7 @@ import {
   toggleMaintenanceMode,
   updateBookingStatus,
 } from "./actions";
+import { formatCustomRugPriceRange } from "@/lib/custom-rug-price";
 
 export type AdminBooking = {
   id: number;
@@ -143,6 +144,14 @@ const formatPrice = (priceCents: number | null) => {
     style: "currency",
     currency: "PLN",
   }).format(priceCents / 100);
+};
+
+const formatBookingPrice = (booking: AdminBooking) => {
+  if (booking.priceCents == null) return "Brak ceny";
+
+  return booking.status === "awaiting_quote"
+    ? formatCustomRugPriceRange(booking.priceCents)
+    : formatPrice(booking.priceCents);
 };
 
 const toDateKey = (date: Date) => {
@@ -773,7 +782,7 @@ export default function AdminDashboardClient({
                       </span>
                       <StatusBadge status={booking.status} />
                       <span className="text-right text-sm font-black text-[var(--ruggy-ink)]">
-                        {formatPrice(booking.priceCents)}
+                        {formatBookingPrice(booking)}
                       </span>
                       <ChevronRight
                         size={16}
@@ -807,7 +816,7 @@ export default function AdminDashboardClient({
                     </span>
                     <span className="shrink-0 text-right">
                       <span className="block text-xs font-black text-[var(--ruggy-ink)]">
-                        {formatPrice(booking.priceCents)}
+                        {formatBookingPrice(booking)}
                       </span>
                       <ChevronRight
                         size={16}
@@ -1327,7 +1336,7 @@ function BookingDrawer({
                     ? "Cena orientacyjna"
                     : "Kwota"
                 }
-                value={formatPrice(booking.priceCents)}
+                value={formatBookingPrice(booking)}
               />
             </div>
           </DetailSection>
