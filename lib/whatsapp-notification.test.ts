@@ -38,9 +38,7 @@ describe("WhatsApp booking notifications", () => {
     );
     expect(payload.template.name).toBe("oplacony_projekt");
     expect(payload.template.language.code).toBe("pl");
-    expect(payload.template.components[0].parameters[0].text).toContain(
-      "/admin/dashboard?booking=91",
-    );
+    expect(payload.template.components).toBeUndefined();
   });
 
   it("keeps the existing quote template for quote notifications", async () => {
@@ -50,9 +48,7 @@ describe("WhatsApp booking notifications", () => {
 
     const payload = JSON.parse(fetchMock.mock.calls[0][1].body as string);
     expect(payload.template.name).toBe("nowa_sprzedaz");
-    expect(payload.template.components[0].parameters[0].text).toContain(
-      "/admin/dashboard?booking=42",
-    );
+    expect(payload.template.components).toBeUndefined();
   });
 
   it("reports missing WhatsApp configuration without making a request", async () => {

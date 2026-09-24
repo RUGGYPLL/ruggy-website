@@ -5,7 +5,6 @@ import {
   formatOutboundRequestError,
   OUTBOUND_REQUEST_TIMEOUT_MS,
 } from "@/lib/outbound-request";
-import { absoluteUrl } from "@/lib/site-config";
 
 export type WhatsAppNotificationResult =
   | { success: true }
@@ -40,7 +39,7 @@ const getProviderErrorMessage = (body: string) => {
 };
 
 const sendBookingWhatsAppNotification = async (
-  bookingId: number,
+  _bookingId: number,
   templateName: string,
 ): Promise<WhatsAppNotificationResult> => {
   const accessToken = process.env.WHATSAPP_ACCESS_TOKEN?.trim();
@@ -73,10 +72,6 @@ const sendBookingWhatsAppNotification = async (
     };
   }
 
-  const bookingUrl = absoluteUrl(
-    `/admin/dashboard?booking=${encodeURIComponent(String(bookingId))}`,
-  );
-
   try {
     const response = await fetch(
       `https://graph.facebook.com/${graphApiVersion}/${phoneNumberId}/messages`,
@@ -96,17 +91,6 @@ const sendBookingWhatsAppNotification = async (
             language: {
               code: templateLanguage,
             },
-            components: [
-              {
-                type: "body",
-                parameters: [
-                  {
-                    type: "text",
-                    text: bookingUrl,
-                  },
-                ],
-              },
-            ],
           },
         }),
         cache: "no-store",
