@@ -1,6 +1,9 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getAdminUser } from "@/lib/auth/server-admin";
-import { getPolandDateKey } from "@/lib/booking-date";
+import {
+  getPolandDateKey,
+  normalizeBookingLeadDays,
+} from "@/lib/booking-date";
 import { redirect } from "next/navigation";
 import {
   AI_RUG_PREVIEWS_FOLDER,
@@ -78,7 +81,7 @@ export default async function AdminDashboardPage({
       .list(AI_RUG_PREVIEWS_FOLDER, { limit: 1000 }),
     supabase
       .from("site_settings")
-      .select("maintenance_mode")
+      .select("maintenance_mode, booking_lead_days")
       .eq("id", "global")
       .maybeSingle(),
   ]);
@@ -183,6 +186,9 @@ export default async function AdminDashboardPage({
         initialSelectedBookingId={initialSelectedBookingId}
         todayDateKey={getPolandDateKey()}
         initialMaintenanceMode={settingsRow?.maintenance_mode === true}
+        initialBookingLeadDays={normalizeBookingLeadDays(
+          settingsRow?.booking_lead_days,
+        )}
       />
     </AdminShell>
   );

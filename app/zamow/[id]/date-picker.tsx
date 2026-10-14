@@ -15,6 +15,7 @@ import { FieldError, fieldErrorId, type FieldErrors } from "./field-error";
 type DatePickerProps = {
   setBooking: Dispatch<SetStateAction<Booking>>;
   blockedDates: Date[];
+  bookingLeadDays: number;
   fieldErrors?: FieldErrors;
 };
 
@@ -73,13 +74,19 @@ const capitalize = (value: string) =>
 export const DatePicker = ({
   setBooking,
   blockedDates,
+  bookingLeadDays,
   fieldErrors = {},
 }: DatePickerProps) => {
   const [selected, setSelected] = useState<Date | undefined>();
-  const [minimumBookingDate] = useState(() => {
-    const [year, month, day] = getMinimumBookingDateKey().split("-").map(Number);
+  const minimumBookingDate = useMemo(() => {
+    const [year, month, day] = getMinimumBookingDateKey(
+      new Date(),
+      bookingLeadDays,
+    )
+      .split("-")
+      .map(Number);
     return new Date(year, month - 1, day);
-  });
+  }, [bookingLeadDays]);
 
   // The first day that is both past the lead time and not blocked. Whole months
   // can be taken, so without this the calendar would open on a month where

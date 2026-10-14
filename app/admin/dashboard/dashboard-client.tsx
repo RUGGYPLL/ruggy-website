@@ -2,8 +2,9 @@
 
 import {
   addDaysToDateKey,
-  BOOKING_LEAD_DAYS,
   getBookingLeadDateKeys,
+  MAX_BOOKING_LEAD_DAYS,
+  MIN_BOOKING_LEAD_DAYS,
 } from "@/lib/booking-date";
 import {
   CalendarDays,
@@ -43,6 +44,7 @@ import {
   generateAiRugPreview,
   toggleBlockedDate,
   toggleMaintenanceMode,
+  updateBookingLeadDays,
   updateBookingStatus,
 } from "./actions";
 import { formatCustomRugPriceRange } from "@/lib/custom-rug-price";
@@ -193,12 +195,14 @@ export default function AdminDashboardClient({
   initialSelectedBookingId,
   todayDateKey,
   initialMaintenanceMode,
+  initialBookingLeadDays,
 }: {
   initialBookings: AdminBooking[];
   initialBlockedDates: string[];
   initialSelectedBookingId: number | null;
   todayDateKey: string;
   initialMaintenanceMode: boolean;
+  initialBookingLeadDays: number;
 }) {
   const [bookings, setBookings] = useState(initialBookings);
   const [blockedDates, setBlockedDates] = useState(initialBlockedDates);
@@ -207,6 +211,12 @@ export default function AdminDashboardClient({
   );
   const [maintenanceMode, setMaintenanceMode] = useState(
     initialMaintenanceMode,
+  );
+  const [bookingLeadDays, setBookingLeadDays] = useState(
+    initialBookingLeadDays,
+  );
+  const [bookingLeadDaysInput, setBookingLeadDaysInput] = useState(
+    String(initialBookingLeadDays),
   );
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
@@ -217,7 +227,8 @@ export default function AdminDashboardClient({
   const [hoveredCalendarDate, setHoveredCalendarDate] = useState<string | null>(
     null,
   );
-  const [selectedCalendarDate, setSelectedCalendarDate] = useState(todayDateKey);
+  const [selectedCalendarDate, setSelectedCalendarDate] =
+    useState(todayDateKey);
   const calendarHoverTimeout = useRef<ReturnType<typeof setTimeout> | null>(
     null,
   );
@@ -335,10 +346,10 @@ export default function AdminDashboardClient({
   );
 
   const automaticBlockedDateKeys = useMemo(
-    () => getBookingLeadDateKeys(todayDateKey),
-    [todayDateKey],
+    () => getBookingLeadDateKeys(todayDateKey, bookingLeadDays),
+    [todayDateKey, bookingLeadDays],
   );
-  const upcomingRangeEnd = addDaysToDateKey(todayDateKey, BOOKING_LEAD_DAYS - 1);
+  const upcomingRangeEnd = addDaysToDateKey(todayDateKey, bookingLeadDays - 1);
   const upcomingBookings = useMemo(
     () =>
       bookings
@@ -399,7 +410,9 @@ export default function AdminDashboardClient({
       const previewUrl = result.previewUrl;
 
       if (!previewUrl) {
-        setActionMessage("Projekt został zapisany, ale nie można go wyświetlić.");
+        setActionMessage(
+          "Projekt został zapisany, ale nie można go wyświetlić.",
+        );
         return;
       }
 
@@ -460,6 +473,36 @@ export default function AdminDashboardClient({
           ? "Przerwa techniczna została włączona."
           : "Strona publiczna została ponownie włączona.",
       );
+    });
+  };
+
+  const handleSaveBookingLeadDays = () => {
+    const nextValue = Number(bookingLeadDaysInput);
+
+    if (
+      !Number.isInteger(nextValue) ||
+      nextValue < MIN_BOOKING_LEAD_DAYS ||
+      nextValue > MAX_BOOKING_LEAD_DAYS
+    ) {
+      setActionMessage(
+        `Podaj liczbę dni od ${MIN_BOOKING_LEAD_DAYS} do ${MAX_BOOKING_LEAD_DAYS}.`,
+      );
+      return;
+    }
+
+    setActionMessage(undefined);
+
+    startTransition(async () => {
+      const result = await updateBookingLeadDays(nextValue);
+
+      if (!result.success) {
+        setActionMessage(result.message);
+        return;
+      }
+
+      setBookingLeadDays(nextValue);
+      setBookingLeadDaysInput(String(nextValue));
+      setActionMessage("Liczba blokowanych dni została zapisana.");
     });
   };
 
@@ -628,6 +671,57 @@ export default function AdminDashboardClient({
           </div>
         </section>
 
+        <section className="rounded-[2rem] border-2 border-[var(--ruggy-border-strong)] bg-[var(--ruggy-surface)] p-5 shadow-[5px_5px_0_var(--ruggy-border)] sm:p-6">
+          <div className="flex flex-col justify-between gap-5 lg:flex-row lg:items-end">
+            <div>
+              <p className="text-xs font-black uppercase tracking-[0.14em] text-[var(--ruggy-blue)]">
+                Terminy realizacji
+              </p>
+              <h2 className="mt-2 text-xl font-black text-[var(--ruggy-ink)]">
+                Automatyczna blokada najbliższych dni
+              </h2>
+              <p className="mt-2 max-w-2xl text-sm leading-6 text-[var(--ruggy-body)]">
+                Te dni będą niedostępne dla nowych zamówień.
+              </p>
+            </div>
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+              <label className="space-y-1.5">
+                <span className="block text-xs font-black uppercase tracking-[0.1em] text-[var(--ruggy-muted)]">
+                  Liczba dni
+                </span>
+                <input
+                  type="number"
+                  min={MIN_BOOKING_LEAD_DAYS}
+                  max={MAX_BOOKING_LEAD_DAYS}
+                  step="1"
+                  inputMode="numeric"
+                  value={bookingLeadDaysInput}
+                  onChange={(event) =>
+                    setBookingLeadDaysInput(event.target.value)
+                  }
+                  className="h-11 w-28 rounded-xl border-2 border-[var(--ruggy-border-strong)] bg-[var(--ruggy-canvas)] px-3 text-center font-black text-[var(--ruggy-ink)] outline-none focus:border-[var(--ruggy-blue)]"
+                  aria-label="Liczba automatycznie blokowanych dni"
+                />
+              </label>
+              <button
+                type="button"
+                disabled={isPending}
+                onClick={handleSaveBookingLeadDays}
+                className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-[var(--ruggy-blue)] px-4 text-sm font-black text-white transition-transform hover:-translate-y-0.5 disabled:cursor-wait disabled:opacity-60"
+              >
+                {isPending ? (
+                  <LoaderCircle
+                    size={16}
+                    className="animate-spin"
+                    aria-hidden="true"
+                  />
+                ) : null}
+                Zapisz ustawienie
+              </button>
+            </div>
+          </div>
+        </section>
+
         <section className="overflow-hidden rounded-[2rem] border-2 border-[var(--ruggy-border-strong)] bg-[var(--ruggy-surface)] shadow-[5px_5px_0_var(--ruggy-border)]">
           <div className="flex flex-col justify-between gap-3 border-b-2 border-[var(--ruggy-border)] px-4 py-4 sm:flex-row sm:items-center sm:px-6">
             <div>
@@ -637,7 +731,7 @@ export default function AdminDashboardClient({
                   className="text-[var(--ruggy-blue)]"
                   aria-hidden="true"
                 />
-                Zlecenia na najbliższe 5 dni
+                Zlecenia na najbliższe {bookingLeadDays} dni
               </h2>
               <p className="mt-1 text-xs text-[var(--ruggy-muted)]">
                 {formatDate(todayDateKey)} – {formatDate(upcomingRangeEnd)}
@@ -680,7 +774,7 @@ export default function AdminDashboardClient({
             </div>
           ) : (
             <div className="flex min-h-28 items-center justify-center px-4 py-6 text-center text-sm text-[var(--ruggy-muted)]">
-              Brak zleceń na najbliższe 5 dni.
+              Brak zleceń na najbliższe {bookingLeadDays} dni.
             </div>
           )}
         </section>
@@ -811,7 +905,8 @@ export default function AdminDashboardClient({
                         <StatusBadge status={booking.status} />
                       </span>
                       <span className="mt-1 block truncate text-xs text-[var(--ruggy-muted)]">
-                        #{booking.id} · {getRugDetails(booking)} · {formatShortDate(booking.bookingDate)}
+                        #{booking.id} · {getRugDetails(booking)} ·{" "}
+                        {formatShortDate(booking.bookingDate)}
                       </span>
                     </span>
                     <span className="shrink-0 text-right">
@@ -857,11 +952,12 @@ export default function AdminDashboardClient({
             </div>
             <div className="flex flex-wrap gap-4 text-xs font-semibold text-[var(--ruggy-body)]">
               <span className="inline-flex items-center gap-2">
-                <span className="size-2 rounded-full bg-[var(--ruggy-yellow)]" /> Zamówienie
+                <span className="size-2 rounded-full bg-[var(--ruggy-yellow)]" />{" "}
+                Zamówienie
               </span>
               <span className="inline-flex items-center gap-2">
-                <span className="size-2 rounded-full bg-[var(--ruggy-ink)]" /> Dzień
-                wolny
+                <span className="size-2 rounded-full bg-[var(--ruggy-ink)]" />{" "}
+                Dzień wolny
               </span>
             </div>
           </div>
@@ -906,7 +1002,9 @@ export default function AdminDashboardClient({
                       type="button"
                       disabled={isPending || isAutomaticBlockedDate}
                       onClick={() =>
-                        handleToggleBlockedDate(parseDateKey(activeCalendarDate))
+                        handleToggleBlockedDate(
+                          parseDateKey(activeCalendarDate),
+                        )
                       }
                       className={`inline-flex min-h-10 items-center gap-2 rounded-xl border-2 px-3 text-xs font-black transition-colors disabled:cursor-not-allowed disabled:opacity-70 ${
                         isActiveCalendarDateBlocked
@@ -924,7 +1022,7 @@ export default function AdminDashboardClient({
                         <Lock size={15} aria-hidden="true" />
                       )}
                       {isAutomaticBlockedDate
-                        ? "Blokada 5 dni"
+                        ? `Blokada ${bookingLeadDays} dni`
                         : isActiveCalendarDateBlocked
                           ? "Odblokuj dzień"
                           : "Zablokuj dzień"}
@@ -1058,8 +1156,12 @@ function StatCard({
     <div className="rounded-[1.5rem] border-2 border-[var(--ruggy-border)] bg-[var(--ruggy-surface)] p-4 shadow-[3px_3px_0_var(--ruggy-border)]">
       <div className="flex items-start justify-between gap-4">
         <div>
-          <p className="text-xs font-semibold text-[var(--ruggy-muted)]">{label}</p>
-          <p className="mt-2 text-2xl font-black tracking-tight text-[var(--ruggy-ink)]">{value}</p>
+          <p className="text-xs font-semibold text-[var(--ruggy-muted)]">
+            {label}
+          </p>
+          <p className="mt-2 text-2xl font-black tracking-tight text-[var(--ruggy-ink)]">
+            {value}
+          </p>
         </div>
         <span
           className={`flex size-9 items-center justify-center rounded-md ${toneClass}`}
@@ -1087,7 +1189,9 @@ function FilterTab({
       type="button"
       onClick={onClick}
       className={`relative flex h-9 shrink-0 items-center gap-1.5 px-3 text-xs font-semibold transition-colors ${
-        active ? "text-[var(--ruggy-ink)]" : "text-[var(--ruggy-muted)] hover:text-[var(--ruggy-ink)]"
+        active
+          ? "text-[var(--ruggy-ink)]"
+          : "text-[var(--ruggy-muted)] hover:text-[var(--ruggy-ink)]"
       }`}
     >
       {label}
@@ -1154,7 +1258,9 @@ function EmptyState({
         <Icon size={19} aria-hidden="true" />
       </span>
       <p className="mt-3 text-sm font-black text-[var(--ruggy-ink)]">{title}</p>
-      <p className="mt-1 max-w-sm text-sm text-[var(--ruggy-muted)]">{description}</p>
+      <p className="mt-1 max-w-sm text-sm text-[var(--ruggy-muted)]">
+        {description}
+      </p>
     </div>
   );
 }
@@ -1272,7 +1378,11 @@ function BookingDrawer({
                 className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-[var(--ruggy-blue)] px-4 text-xs font-black text-white transition-opacity hover:opacity-85 disabled:cursor-not-allowed disabled:opacity-45"
               >
                 {isGenerating ? (
-                  <LoaderCircle className="animate-spin" size={16} aria-hidden="true" />
+                  <LoaderCircle
+                    className="animate-spin"
+                    size={16}
+                    aria-hidden="true"
+                  />
                 ) : (
                   <WandSparkles size={16} aria-hidden="true" />
                 )}
@@ -1489,7 +1599,11 @@ function ProjectImage({
       className="group overflow-hidden rounded-2xl border-2 border-[var(--ruggy-border-strong)] bg-[var(--ruggy-blue-soft)] transition-colors hover:border-[var(--ruggy-ink)]"
     >
       {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src={imageUrl} alt={alt} className="aspect-square w-full object-contain" />
+      <img
+        src={imageUrl}
+        alt={alt}
+        className="aspect-square w-full object-contain"
+      />
       <span className="flex min-h-10 items-center gap-2 border-t-2 border-[var(--ruggy-border)] bg-[var(--ruggy-surface)] px-3 text-xs font-black text-[var(--ruggy-ink)]">
         <Icon size={14} aria-hidden="true" />
         {title}
@@ -1530,7 +1644,9 @@ function DetailRow({
 }) {
   const content = (
     <>
-      <p className="text-[11px] font-semibold text-[var(--ruggy-muted)]">{label}</p>
+      <p className="text-[11px] font-semibold text-[var(--ruggy-muted)]">
+        {label}
+      </p>
       <p
         className={`mt-1 break-words text-sm font-black leading-5 text-[var(--ruggy-ink)] ${mono ? "font-mono text-[11px]" : ""}`}
       >

@@ -1,6 +1,19 @@
 const POLAND_TIME_ZONE = "Europe/Warsaw";
 
-export const BOOKING_LEAD_DAYS = 5;
+export const DEFAULT_BOOKING_LEAD_DAYS = 5;
+export const BOOKING_LEAD_DAYS = DEFAULT_BOOKING_LEAD_DAYS;
+export const MIN_BOOKING_LEAD_DAYS = 1;
+export const MAX_BOOKING_LEAD_DAYS = 30;
+
+export const normalizeBookingLeadDays = (value: unknown) => {
+  const days = typeof value === "number" ? value : Number(value);
+
+  return Number.isInteger(days) &&
+    days >= MIN_BOOKING_LEAD_DAYS &&
+    days <= MAX_BOOKING_LEAD_DAYS
+    ? days
+    : DEFAULT_BOOKING_LEAD_DAYS;
+};
 
 export const formatLocalDateKey = (date: Date) => {
   const year = date.getFullYear();
@@ -54,10 +67,15 @@ export const addDaysToDateKey = (dateKey: string, days: number) => {
   ].join("-");
 };
 
-export const getMinimumBookingDateKey = (date = new Date()) =>
-  addDaysToDateKey(getPolandDateKey(date), BOOKING_LEAD_DAYS);
+export const getMinimumBookingDateKey = (
+  date = new Date(),
+  leadDays = DEFAULT_BOOKING_LEAD_DAYS,
+) => addDaysToDateKey(getPolandDateKey(date), normalizeBookingLeadDays(leadDays));
 
-export const getBookingLeadDateKeys = (todayDateKey: string) =>
-  Array.from({ length: BOOKING_LEAD_DAYS }, (_, index) =>
+export const getBookingLeadDateKeys = (
+  todayDateKey: string,
+  leadDays = DEFAULT_BOOKING_LEAD_DAYS,
+) =>
+  Array.from({ length: normalizeBookingLeadDays(leadDays) }, (_, index) =>
     addDaysToDateKey(todayDateKey, index),
   );

@@ -1,8 +1,10 @@
 "use server";
 
 import {
+  BOOKING_LEAD_DAYS,
   getMinimumBookingDateKey,
   isValidDateKey,
+  normalizeBookingLeadDays,
 } from "@/lib/booking-date";
 import {
   calculateCustomRugPriceCents,
@@ -53,13 +55,14 @@ const MAX_REFERENCE_IMAGE_SIZE = 5 * 1024 * 1024;
 async function validateBookingDate(
   supabase: ReturnType<typeof createAdminClient>,
   pickupDate: string,
+  bookingLeadDays: number,
 ) {
   if (!isValidDateKey(pickupDate)) {
     return "Wybrano nieprawidłowy termin.";
   }
 
-  if (pickupDate < getMinimumBookingDateKey()) {
-    return "Najbliższy możliwy termin realizacji jest za 5 dni.";
+  if (pickupDate < getMinimumBookingDateKey(new Date(), bookingLeadDays)) {
+    return `Najbliższy możliwy termin realizacji jest za ${bookingLeadDays} dni.`;
   }
 
   const { data: blockedDate, error } = await supabase
@@ -76,6 +79,23 @@ async function validateBookingDate(
   return blockedDate
     ? "Wybrany termin jest niedostępny. Wybierz inny dzień."
     : null;
+}
+
+async function readBookingLeadDays(
+  supabase: ReturnType<typeof createAdminClient>,
+) {
+  const { data, error } = await supabase
+    .from("site_settings")
+    .select("booking_lead_days")
+    .eq("id", "global")
+    .maybeSingle();
+
+  if (error) {
+    console.error("Nie udało się pobrać ustawień terminów:", error);
+    return BOOKING_LEAD_DAYS;
+  }
+
+  return normalizeBookingLeadDays(data?.booking_lead_days);
 }
 
 export async function uploadReferenceImage(file: File) {
@@ -157,7 +177,12 @@ export async function createCheckoutSession(input: unknown) {
   }
 
   const supabase = createAdminClient();
-  const dateError = await validateBookingDate(supabase, booking.pickupDate);
+  const bookingLeadDays = await readBookingLeadDays(supabase);
+  const dateError = await validateBookingDate(
+    supabase,
+    booking.pickupDate,
+    bookingLeadDays,
+  );
 
   if (dateError) return { success: false, message: dateError };
 
@@ -382,7 +407,12 @@ export async function createContactBooking(input: unknown) {
   }
 
   const supabase = createAdminClient();
-  const dateError = await validateBookingDate(supabase, booking.pickupDate);
+  const bookingLeadDays = await readBookingLeadDays(supabase);
+  const dateError = await validateBookingDate(
+    supabase,
+    booking.pickupDate,
+    bookingLeadDays,
+  );
 
   if (dateError) return { success: false, message: dateError };
 

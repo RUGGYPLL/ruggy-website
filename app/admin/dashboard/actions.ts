@@ -1,6 +1,10 @@
 "use server";
 
 import { getAuthorizedAdminClient } from "@/lib/auth/server-admin";
+import {
+  MAX_BOOKING_LEAD_DAYS,
+  MIN_BOOKING_LEAD_DAYS,
+} from "@/lib/booking-date";
 import { createRugDesign } from "@/lib/openai-rug-design";
 import {
   getAiRugPreviewPath,
@@ -126,6 +130,48 @@ export async function toggleMaintenanceMode(shouldEnable: boolean) {
 
   revalidatePath("/admin/dashboard");
   return { success: true };
+}
+
+export async function updateBookingLeadDays(days: number) {
+  if (
+    !Number.isInteger(days) ||
+    days < MIN_BOOKING_LEAD_DAYS ||
+    days > MAX_BOOKING_LEAD_DAYS
+  ) {
+    return {
+      success: false,
+      message: `Podaj liczbę dni od ${MIN_BOOKING_LEAD_DAYS} do ${MAX_BOOKING_LEAD_DAYS}.`,
+    };
+  }
+
+  const supabase = await getAdminClient();
+
+  if (!supabase) {
+    return { success: false, message: "Sesja administratora wygasła." };
+  }
+
+  const { error } = await supabase
+    .from("site_settings")
+    .upsert(
+      {
+        id: "global",
+        booking_lead_days: days,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: "id" },
+    );
+
+  if (error) {
+    console.error("Nie udało się zmienić liczby blokowanych dni:", error);
+    return {
+      success: false,
+      message: "Nie udało się zapisać liczby blokowanych dni.",
+    };
+  }
+
+  revalidatePath("/admin/dashboard");
+  revalidatePath("/zamow/[id]", "page");
+  return { success: true, bookingLeadDays: days };
 }
 
 export async function generateAiRugPreview(bookingId: number) {

@@ -10,7 +10,11 @@ import {
   type RugPhotoRow,
 } from "@/lib/rug-photos";
 import { createClient } from "@/lib/supabase/client";
-import { formatLocalDateKey } from "@/lib/booking-date";
+import {
+  BOOKING_LEAD_DAYS,
+  formatLocalDateKey,
+  normalizeBookingLeadDays,
+} from "@/lib/booking-date";
 import {
   calculateCustomRugPriceCents,
   formatCustomRugPriceRange,
@@ -163,6 +167,7 @@ export default function ProductPage({
   const preselectedVariantId =
     variantParam && /^\d+$/.test(variantParam) ? Number(variantParam) : null;
   const [blockedDays, setBlockedDays] = useState<Date[]>([]);
+  const [bookingLeadDays, setBookingLeadDays] = useState(BOOKING_LEAD_DAYS);
   const [rugType, setRugType] = useState<RugTypeSummary | null>(null);
   const [realizations, setRealizations] = useState<GalleryPhoto[]>([]);
   const [submitMessage, setSubmitMessage] = useState<string>();
@@ -205,11 +210,17 @@ export default function ProductPage({
     const loadPageData = async () => {
       const [
         { data: blockedDates },
+        { data: settingsRow },
         { data: selectedRugType },
         { data: parentPhotoRows },
         { data: variantPhotoRows },
       ] = await Promise.all([
         supabase.from("blocked_dates").select("date"),
+        supabase
+          .from("site_settings")
+          .select("booking_lead_days")
+          .eq("id", "global")
+          .maybeSingle(),
         supabase
           .from("rug_types")
           .select(
@@ -236,6 +247,7 @@ export default function ProductPage({
       if (!isMounted) return;
 
       setBlockedDays(blockedDates?.map((item) => new Date(item.date)) ?? []);
+      setBookingLeadDays(normalizeBookingLeadDays(settingsRow?.booking_lead_days));
       setRugType(selectedRugType);
 
       const parentPhotos = mapRugPhotos(
@@ -621,6 +633,7 @@ export default function ProductPage({
               />
               <DatePicker
                 blockedDates={blockedDays}
+                bookingLeadDays={bookingLeadDays}
                 setBooking={setBooking}
                 fieldErrors={fieldErrors}
               />

@@ -11,7 +11,7 @@ vi.mock("next/cache", () => ({
 }));
 
 import { getAuthorizedAdminClient } from "@/lib/auth/server-admin";
-import { toggleMaintenanceMode } from "./actions";
+import { toggleMaintenanceMode, updateBookingLeadDays } from "./actions";
 
 const getAuthorizedAdminClientMock = vi.mocked(getAuthorizedAdminClient);
 
@@ -58,6 +58,47 @@ describe("toggleMaintenanceMode", () => {
     await expect(toggleMaintenanceMode(false)).resolves.toEqual({
       success: false,
       message: "Nie udało się zmienić trybu przerwy technicznej.",
+    });
+  });
+});
+
+describe("updateBookingLeadDays", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("rejects values outside the supported range", async () => {
+    await expect(updateBookingLeadDays(0)).resolves.toEqual({
+      success: false,
+      message: "Podaj liczbę dni od 1 do 30.",
+    });
+    expect(getAuthorizedAdminClientMock).not.toHaveBeenCalled();
+  });
+
+  it("persists the requested number of days for an authorized administrator", async () => {
+    const upsert = vi.fn().mockResolvedValue({ error: null });
+    const from = vi.fn().mockReturnValue({ upsert });
+    getAuthorizedAdminClientMock.mockResolvedValue({ from } as never);
+
+    await expect(updateBookingLeadDays(8)).resolves.toEqual({
+      success: true,
+      bookingLeadDays: 8,
+    });
+    expect(upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: "global",
+        booking_lead_days: 8,
+      }),
+      { onConflict: "id" },
+    );
+  });
+
+  it("requires an authorized administrator", async () => {
+    getAuthorizedAdminClientMock.mockResolvedValue(null);
+
+    await expect(updateBookingLeadDays(8)).resolves.toEqual({
+      success: false,
+      message: "Sesja administratora wygasła.",
     });
   });
 });
